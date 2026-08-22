@@ -24,15 +24,5 @@ class Settings(BaseSettings):
     sync_lock_duration_seconds: int = 300  # 5 minutes
     sync_failure_threshold: int = 3
 
-    @property
-    def database_url_with_params(self) -> str:
-        """Return database URL with Supabase-recommended parameters for Vercel."""
-        url = self.database_url
-        if "?" not in url:
-            url += "?"
-        else:
-            url += "&"
-        return f"{url}sslmode=require&tcp_keepalives=true&tcp_keepalives_idle=30&tcp_keepalives_interval=10&tcp_keepalives_count=5"
-
 
 settings = Settings()
