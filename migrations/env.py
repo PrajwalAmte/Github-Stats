@@ -36,12 +36,19 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    import psycopg
+    from sqlalchemy import engine_from_config, pool
 
-    connectable = psycopg.connect(settings.database_url)
+    configuration = config.get_section(config.config_ini_section)
+    configuration["sqlalchemy.url"] = settings.database_url
 
-    with connectable:
-        context.configure(connection=connectable, target_metadata=None)
+    connectable = engine_from_config(
+        configuration,
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=None)
 
         with context.begin_transaction():
             context.run_migrations()
