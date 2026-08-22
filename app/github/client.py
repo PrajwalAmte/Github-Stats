@@ -10,11 +10,7 @@ from app.exceptions import (
     GithubRateLimitError,
 )
 from app.github.models import GithubRepository, GithubUserResponse, RepositoryLanguages
-from app.github.queries import (
-    PAGINATED_REPOS_QUERY,
-    REPO_LANGUAGES_QUERY,
-    USER_QUERY,
-)
+from app.github.queries import PAGINATED_REPOS_QUERY, REPO_LANGUAGES_QUERY, USER_QUERY
 
 logger = logging.getLogger(__name__)
 

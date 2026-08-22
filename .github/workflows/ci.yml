@@ -142,7 +142,7 @@ jobs:
         run: |
           echo "## CI Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All checks passed!" >> $GITHUB_STEP_SUMMARY
+          echo "All checks passed!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Code formatting: Passed" >> $GITHUB_STEP_SUMMARY
           echo "- Linting: Passed" >> $GITHUB_STEP_SUMMARY

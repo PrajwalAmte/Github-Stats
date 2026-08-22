@@ -3,14 +3,7 @@ from datetime import date
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.db.models import (
-    ContributionDay,
-    DailySnapshot,
-    LanguageTotal,
-    Repository,
-    SyncState,
-    User,
-)
+from app.db.models import ContributionDay, DailySnapshot, LanguageTotal, Repository, SyncState, User
 
 
 class UserRepository:
