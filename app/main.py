@@ -97,8 +97,6 @@ async def add_cache_headers(request, call_next):
         and response.status_code == 200
         and request.url.path.startswith("/v1/users/")
     ):
-        response.headers["Cache-Control"] = (
-            "public, s-maxage=3600, stale-while-revalidate=86400"
-        )
+        response.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=86400"
 
     return response

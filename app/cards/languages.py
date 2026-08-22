@@ -62,23 +62,23 @@ def generate_languages_card(
     # Start building SVG
     svg_parts = [
         '<svg width="500" height="320" xmlns="http://www.w3.org/2000/svg">',
-        '  <defs>',
-        '    <style>',
-        '      .card { fill: #0d1117; }',
-        '      .border { fill: none; stroke: #30363d; stroke-width: 1; }',
-        '      .title { fill: #c9d1d9; font-size: 18px; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Noto Sans\', Helvetica, Arial, sans-serif; }',
-        '      .lang-name { fill: #c9d1d9; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Noto Sans\', Helvetica, Arial, sans-serif; }',
-        '      .percentage { fill: #8b949e; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Noto Sans\', Helvetica, Arial, sans-serif; }',
-        '      .footer { fill: #6e7681; font-size: 11px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', \'Noto Sans\', Helvetica, Arial, sans-serif; }',
-        '      .bar-bg { fill: #21262d; }',
-        '    </style>',
-        '  </defs>',
-        '',
+        "  <defs>",
+        "    <style>",
+        "      .card { fill: #0d1117; }",
+        "      .border { fill: none; stroke: #30363d; stroke-width: 1; }",
+        "      .title { fill: #c9d1d9; font-size: 18px; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; }",
+        "      .lang-name { fill: #c9d1d9; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; }",
+        "      .percentage { fill: #8b949e; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; }",
+        "      .footer { fill: #6e7681; font-size: 11px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; }",
+        "      .bar-bg { fill: #21262d; }",
+        "    </style>",
+        "  </defs>",
+        "",
         '  <rect class="card" width="500" height="320" rx="6"/>',
         '  <rect class="border" width="498" height="318" x="1" y="1" rx="6"/>',
-        '',
+        "",
         f'  <text class="title" x="250" y="35" text-anchor="middle">{username}\'s Most Used Languages</text>',
-        '',
+        "",
     ]
 
     # Add language bars
@@ -90,22 +90,32 @@ def generate_languages_card(
         color = language_colors.get(lang_name, "#858585")
 
         # Background bar
-        svg_parts.append(f'  <!-- {lang_name} -->')
-        svg_parts.append(f'  <rect class="bar-bg" x="30" y="{y_position}" width="{max_bar_width}" height="{bar_height}" rx="4"/>')
+        svg_parts.append(f"  <!-- {lang_name} -->")
+        svg_parts.append(
+            f'  <rect class="bar-bg" x="30" y="{y_position}" width="{max_bar_width}" height="{bar_height}" rx="4"/>'
+        )
 
         # Filled bar
-        svg_parts.append(f'  <rect fill="{color}" x="30" y="{y_position}" width="{bar_width}" height="{bar_height}" rx="4"/>')
+        svg_parts.append(
+            f'  <rect fill="{color}" x="30" y="{y_position}" width="{bar_width}" height="{bar_height}" rx="4"/>'
+        )
 
         # Language name
-        svg_parts.append(f'  <text class="lang-name" x="30" y="{y_position - 6}">{lang_name}</text>')
+        svg_parts.append(
+            f'  <text class="lang-name" x="30" y="{y_position - 6}">{lang_name}</text>'
+        )
 
         # Percentage
-        svg_parts.append(f'  <text class="percentage" x="{30 + max_bar_width}" y="{y_position - 6}" text-anchor="end">{percentage:.1f}%</text>')
-        svg_parts.append('')
+        svg_parts.append(
+            f'  <text class="percentage" x="{30 + max_bar_width}" y="{y_position - 6}" text-anchor="end">{percentage:.1f}%</text>'
+        )
+        svg_parts.append("")
 
     # Footer
     footer_y = start_y + (len(top_languages) * bar_spacing) + 20
-    svg_parts.append(f'  <text class="footer" x="250" y="{footer_y}" text-anchor="middle">Last updated: {last_updated}</text>')
-    svg_parts.append('</svg>')
+    svg_parts.append(
+        f'  <text class="footer" x="250" y="{footer_y}" text-anchor="middle">Last updated: {last_updated}</text>'
+    )
+    svg_parts.append("</svg>")
 
-    return '\n'.join(svg_parts)
+    return "\n".join(svg_parts)

@@ -1,6 +1,5 @@
 """Tests for language statistics."""
 
-
 from app.stats.languages import calculate_language_percentages
 
 

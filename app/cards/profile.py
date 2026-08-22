@@ -33,6 +33,7 @@ def generate_profile_card(
     Returns:
         SVG markup as string
     """
+
     # Format large numbers with commas
     def format_num(n: int) -> str:
         return f"{n:,}"

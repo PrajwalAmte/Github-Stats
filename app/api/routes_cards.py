@@ -1,6 +1,5 @@
 """SVG card API endpoints."""
 
-
 from fastapi import APIRouter, HTTPException, Response
 
 from app.cards.languages import generate_languages_card
@@ -113,8 +112,7 @@ def get_languages_card(username: str) -> Response:
     else:
         total_bytes = sum(lang.byte_count for lang in language_totals)
         languages = [
-            (lang.language, (lang.byte_count / total_bytes) * 100)
-            for lang in language_totals[:6]
+            (lang.language, (lang.byte_count / total_bytes) * 100) for lang in language_totals[:6]
         ]
 
     svg_content = generate_languages_card(

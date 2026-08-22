@@ -151,9 +151,7 @@ def get_user_languages(username: str) -> LanguagesResponse:
         sync_state = SyncStateRepository.get(session, username)
 
     # Calculate percentages
-    lang_data = [
-        (lang.language, lang.byte_count) for lang in language_totals
-    ]
+    lang_data = [(lang.language, lang.byte_count) for lang in language_totals]
     percentages = calculate_language_percentages(lang_data)
 
     languages = [

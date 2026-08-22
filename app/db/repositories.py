@@ -344,9 +344,7 @@ class SyncStateRepository:
         session.commit()
 
     @staticmethod
-    def acquire_lock(
-        session: Session, username: str, token: str, duration_seconds: int
-    ) -> bool:
+    def acquire_lock(session: Session, username: str, token: str, duration_seconds: int) -> bool:
         """
         Attempt to acquire sync lock.
         Returns True if lock was acquired, False if already locked.

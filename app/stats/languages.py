@@ -12,7 +12,7 @@ class LanguagePercentage(NamedTuple):
 
 
 def calculate_language_percentages(
-    language_totals: list[tuple[str, int]]
+    language_totals: list[tuple[str, int]],
 ) -> list[LanguagePercentage]:
     """
     Calculate language percentages from byte counts.

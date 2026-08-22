@@ -206,7 +206,11 @@ class SyncService:
 
         for repo in user_data.repositories.nodes:
             primary_lang = repo.primary_language.name if repo.primary_language else None
-            pushed_at = datetime.fromisoformat(repo.pushed_at.replace("Z", "+00:00")) if repo.pushed_at else None
+            pushed_at = (
+                datetime.fromisoformat(repo.pushed_at.replace("Z", "+00:00"))
+                if repo.pushed_at
+                else None
+            )
 
             repositories.append(
                 Repository(
@@ -224,7 +228,9 @@ class SyncService:
 
         return repositories
 
-    async def _fetch_languages(self, username: str, repositories: list[Repository]) -> list[LanguageTotal]:
+    async def _fetch_languages(
+        self, username: str, repositories: list[Repository]
+    ) -> list[LanguageTotal]:
         """Fetch detailed language data for all repositories."""
         language_totals: dict[str, int] = {}
 
@@ -245,7 +251,9 @@ class SyncService:
                         byte_count = lang_edge.size
 
                         if lang_name:
-                            language_totals[lang_name] = language_totals.get(lang_name, 0) + byte_count
+                            language_totals[lang_name] = (
+                                language_totals.get(lang_name, 0) + byte_count
+                            )
             except Exception as e:
                 logger.warning(f"Failed to fetch languages for {repo.owner}/{repo.name}: {e}")
                 continue
@@ -254,10 +262,7 @@ class SyncService:
         now = datetime.now()
         return [
             LanguageTotal(
-                username=username,
-                language=lang_name,
-                byte_count=byte_count,
-                updated_at=now
+                username=username, language=lang_name, byte_count=byte_count, updated_at=now
             )
             for lang_name, byte_count in language_totals.items()
         ]
