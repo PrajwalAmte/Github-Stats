@@ -121,7 +121,7 @@ class SyncService:
                         avatar_url=user_data.avatar_url,
                         followers=user_data.followers.total_count,
                         following=user_data.following.total_count,
-                        public_repos=repo_count,
+                        public_repos=len(repositories),
                         total_commits=aggregates.total_commits,
                         total_pull_requests=aggregates.total_pull_requests,
                         total_issues=aggregates.total_issues,
