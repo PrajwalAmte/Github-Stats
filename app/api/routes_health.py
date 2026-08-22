@@ -1,5 +1,6 @@
 """Health and readiness check endpoints."""
 
+import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -21,6 +22,15 @@ class ReadyResponse(BaseModel):
     status: str
     database: str
     data_available: bool
+
+
+class DebugResponse(BaseModel):
+    """Debug response showing environment."""
+
+    database_url_set: bool
+    github_token_set: bool
+    sync_secret_set: bool
+    environment: str | None
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -81,3 +91,14 @@ def readiness_check() -> ReadyResponse:
             database=f"error: {str(e)}",
             data_available=False,
         )
+
+
+@router.get("/debug", response_model=DebugResponse, tags=["debug"])
+def debug_info() -> DebugResponse:
+    """Debug endpoint to check environment variables."""
+    return DebugResponse(
+        database_url_set=bool(os.getenv("DATABASE_URL")),
+        github_token_set=bool(os.getenv("GITHUB_TOKEN")),
+        sync_secret_set=bool(os.getenv("SYNC_SECRET")),
+        environment=os.getenv("ENVIRONMENT"),
+    )
