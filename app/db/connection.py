@@ -32,6 +32,7 @@ def get_engine() -> Engine:
             pool_recycle=300,
             connect_args={
                 "connect_timeout": 10,
+                "prepare_threshold": None,  # Disable prepared statements for Supavisor transaction pooling
             },
         )
     return _engine
