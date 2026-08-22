@@ -1,47 +1,66 @@
-from collections.abc import Generator
 from contextlib import contextmanager
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from typing import Generator
 
-import psycopg
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 
+_engine: Engine | None = None
+_SessionLocal: sessionmaker[Session] | None = None
 
-def _build_connection_string(base_url: str) -> str:
-    """Build connection string with Supabase-optimized parameters."""
-    parsed = urlparse(base_url)
-    query_params = parse_qs(parsed.query)
+
+def get_engine() -> Engine:
+    """Get or create SQLAlchemy engine for database connections.
     
-    query_params.setdefault("sslmode", ["require"])
-    query_params.setdefault("target_session_attrs", ["read-write"])
-    
-    new_query = urlencode({k: v[0] for k, v in query_params.items()})
-    return urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        new_query,
-        parsed.fragment,
-    ))
+    SQLAlchemy handles connection pooling and parameters better than raw psycopg,
+    especially in serverless environments like Vercel.
+    """
+    global _engine
+    if _engine is None:
+        # Create engine with minimal pool size for serverless
+        _engine = create_engine(
+            settings.database_url,
+            echo=False,
+            pool_size=1,
+            max_overflow=0,
+            pool_pre_ping=True,  # Test connections before using
+            pool_recycle=300,  # Recycle connections every 5 minutes
+            connect_args={
+                "connect_timeout": 10,
+            },
+        )
+    return _engine
+
+
+def get_session() -> sessionmaker[Session]:
+    """Get or create session factory."""
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(bind=get_engine(), expire_on_commit=False)
+    return _SessionLocal
 
 
 @contextmanager
-def get_db() -> Generator[psycopg.Connection, None, None]:
-    """Get a database connection for each request.
+def get_db() -> Generator:
+    """Context manager for database operations using SQLAlchemy.
     
-    Direct connections work better on Vercel's serverless environment than pooling.
-    Each request gets its own fresh connection that's properly closed after use.
-    Adds Supabase-recommended SSL and session parameters.
+    Returns a SQLAlchemy Session that can be used for ORM operations.
+    For raw SQL, use session.execute(text("SELECT ..."))
     """
-    conn_str = _build_connection_string(settings.database_url)
-    conn = psycopg.connect(conn_str, connect_timeout=10)
+    SessionLocal = get_session()
+    session = SessionLocal()
     try:
-        yield conn
+        yield session
     finally:
-        conn.close()
+        session.close()
 
 
 def close_pool() -> None:
-    """No-op for compatibility with existing code."""
-    pass
+    """Close the connection pool and reset engine."""
+    global _engine, _SessionLocal
+    if _engine is not None:
+        _engine.dispose()
+        _engine = None
+        _SessionLocal = None

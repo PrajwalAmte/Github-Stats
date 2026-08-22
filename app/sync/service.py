@@ -51,11 +51,11 @@ class SyncService:
         lock_token = secrets.token_hex(16)
 
         # Acquire lock
-        with get_db() as conn:
+        with get_db() as session:
             acquired = SyncStateRepository.acquire_lock(
-                conn, username, lock_token, settings.sync_lock_duration_seconds
+                session, username, lock_token, settings.sync_lock_duration_seconds
             )
-            conn.commit()
+            session.commit()
 
         if not acquired:
             raise SyncAlreadyRunningError(f"Sync already running for {username}")
@@ -100,17 +100,17 @@ class SyncService:
             )
 
             # Atomic database update - all or nothing
-            with get_db() as conn:
-                with conn.transaction():
+            with get_db() as session:
+                try:
                     # Upsert repositories
-                    RepositoryRepository.upsert_many(conn, repositories)
+                    RepositoryRepository.upsert_many(session, repositories)
 
                     # Upsert contribution days
                     contribution_models = [
                         ContributionDay(username=username, date=d, count=c)
                         for d, c in contributions
                     ]
-                    ContributionRepository.upsert_many(conn, contribution_models)
+                    ContributionRepository.upsert_many(session, contribution_models)
 
                     # Update user with aggregates
                     user = User(
@@ -133,18 +133,21 @@ class SyncService:
                         stats_computed_at=datetime.now(),
                         updated_at=datetime.now(),
                     )
-                    UserRepository.upsert(conn, user)
+                    UserRepository.upsert(session, user)
 
                     # Create daily snapshot
                     snapshot = create_daily_snapshot(
                         username, user, user_data.followers.total_count
                     )
-                    SnapshotRepository.upsert(conn, snapshot)
+                    SnapshotRepository.upsert(session, snapshot)
 
                     # Mark sync as successful
-                    SyncStateRepository.update_success(conn, username)
+                    SyncStateRepository.update_success(session, username)
 
-                # Transaction commits here
+                    session.commit()
+                except Exception as e:
+                    session.rollback()
+                    raise
 
             logger.info(f"Successfully synced {username}")
 
@@ -160,9 +163,9 @@ class SyncService:
             error_msg = str(e)
             logger.error(f"GitHub API error for {username}: {error_msg}")
 
-            with get_db() as conn:
-                SyncStateRepository.update_failure(conn, username, error_msg)
-                conn.commit()
+            with get_db() as session:
+                SyncStateRepository.update_failure(session, username, error_msg)
+                session.commit()
 
             raise
 
@@ -171,17 +174,17 @@ class SyncService:
             error_msg = f"Unexpected error: {str(e)}"
             logger.error(f"Sync error for {username}: {error_msg}", exc_info=True)
 
-            with get_db() as conn:
-                SyncStateRepository.update_failure(conn, username, error_msg)
-                conn.commit()
+            with get_db() as session:
+                SyncStateRepository.update_failure(session, username, error_msg)
+                session.commit()
 
             raise
 
         finally:
             # Always release the lock
-            with get_db() as conn:
-                SyncStateRepository.release_lock(conn, username, lock_token)
-                conn.commit()
+            with get_db() as session:
+                SyncStateRepository.release_lock(session, username, lock_token)
+                session.commit()
 
     def _extract_contributions(self, user_data) -> list[tuple[date, int]]:
         """Extract contribution days from GitHub user data."""

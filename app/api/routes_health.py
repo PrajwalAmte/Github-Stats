@@ -61,16 +61,15 @@ def readiness_check() -> ReadyResponse:
     data_available = False
 
     try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                # Check database connectivity
-                cur.execute("SELECT 1")
-                db_status = "connected"
+        with get_db() as session:
+            from sqlalchemy import text
 
-                # Check if any data exists
-                cur.execute("SELECT COUNT(*) FROM users")
-                count = cur.fetchone()
-                data_available = count[0] > 0 if count else False
+            session.execute(text("SELECT 1"))
+            db_status = "connected"
+
+            result = session.execute(text("SELECT COUNT(*) FROM users"))
+            count = result.scalar()
+            data_available = count > 0 if count else False
 
         if db_status == "connected" and data_available:
             return ReadyResponse(
