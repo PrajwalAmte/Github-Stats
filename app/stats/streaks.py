@@ -56,13 +56,5 @@ def calculate_streaks(contributions: list[tuple[date, int]]) -> tuple[int, int]:
 
 
 def calculate_contribution_total(contributions: list[tuple[date, int]]) -> int:
-    """
-    Calculate total contribution count.
-
-    Args:
-        contributions: List of (date, count) tuples
-
-    Returns:
-        Sum of all contribution counts
-    """
+    """Calculate total contribution count from (date, count) tuples."""
     return sum(count for _, count in contributions)

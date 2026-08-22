@@ -23,12 +23,7 @@ def calculate_language_percentages(
     Returns:
         List of LanguagePercentage with calculated percentages, sorted descending by bytes
     """
-    if not language_totals:
-        return []
-
-    total_bytes = sum(bytes_count for _, bytes_count in language_totals)
-
-    if total_bytes == 0:
+    if not language_totals or (total_bytes := sum(b for _, b in language_totals)) == 0:
         return []
 
     results = [

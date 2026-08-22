@@ -41,9 +41,9 @@ class GithubClient:
 
             if response.status_code == 401:
                 raise GithubAuthenticationError("GitHub authentication failed")
-            elif response.status_code == 403:
+            if response.status_code == 403:
                 raise GithubRateLimitError("GitHub API rate limit exceeded")
-            elif response.status_code >= 500:
+            if response.status_code >= 500:
                 raise GithubApiError(f"GitHub API server error: {response.status_code}")
 
             data = response.json()

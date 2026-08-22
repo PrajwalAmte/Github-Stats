@@ -50,16 +50,14 @@ def generate_languages_card(
 
     # Take top 6 languages
     top_languages = languages[:6]
-    
+
     # Calculate bar positions
     bar_height = 24
     bar_spacing = 40
     start_y = 60
     max_bar_width = 440
 
-    last_updated = ""
-    if last_sync:
-        last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC")
+    last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else ""
 
     # Start building SVG
     svg_parts = [
@@ -87,20 +85,20 @@ def generate_languages_card(
     for idx, (lang_name, percentage) in enumerate(top_languages):
         y_position = start_y + (idx * bar_spacing)
         bar_width = (percentage / 100) * max_bar_width
-        
+
         # Get color for language (default to gray if not found)
         color = language_colors.get(lang_name, "#858585")
-        
+
         # Background bar
         svg_parts.append(f'  <!-- {lang_name} -->')
         svg_parts.append(f'  <rect class="bar-bg" x="30" y="{y_position}" width="{max_bar_width}" height="{bar_height}" rx="4"/>')
-        
+
         # Filled bar
         svg_parts.append(f'  <rect fill="{color}" x="30" y="{y_position}" width="{bar_width}" height="{bar_height}" rx="4"/>')
-        
+
         # Language name
         svg_parts.append(f'  <text class="lang-name" x="30" y="{y_position - 6}">{lang_name}</text>')
-        
+
         # Percentage
         svg_parts.append(f'  <text class="percentage" x="{30 + max_bar_width}" y="{y_position - 6}" text-anchor="end">{percentage:.1f}%</text>')
         svg_parts.append('')

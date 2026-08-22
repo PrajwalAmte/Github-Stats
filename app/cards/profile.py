@@ -37,9 +37,7 @@ def generate_profile_card(
     def format_num(n: int) -> str:
         return f"{n:,}"
 
-    last_updated = ""
-    if last_sync:
-        last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC")
+    last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else ""
 
     svg = f"""
 <svg width="500" height="300" xmlns="http://www.w3.org/2000/svg">

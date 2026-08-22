@@ -30,21 +30,7 @@ def compute_user_aggregates(
     total_stars: int,
     total_forks: int,
 ) -> UserAggregates:
-    """
-    Compute final user aggregates from various sources.
-
-    Args:
-        github_totals: Dict with totalCommitContributions, etc. from GitHub API
-        current_streak: Calculated current streak
-        longest_streak: Calculated longest streak
-        contribution_count: Sum of contribution calendar
-        repo_count: Number of repositories
-        total_stars: Total stars across repos
-        total_forks: Total forks across repos
-
-    Returns:
-        UserAggregates with all computed values
-    """
+    """Compute final user aggregates from GitHub totals and calculated streaks."""
     return UserAggregates(
         total_commits=github_totals.get("totalCommitContributions", 0),
         total_pull_requests=github_totals.get("totalPullRequestContributions", 0),

@@ -80,15 +80,12 @@ class SyncService:
             current_streak, longest_streak = calculate_streaks(contributions)
             contribution_count = calculate_contribution_total(contributions)
 
-            repo_count = len(repositories)
-            total_stars = sum(r.stars for r in repositories)
-            total_forks = sum(r.forks for r in repositories)
-
+            cc = user_data.contributions_collection
             github_totals = {
-                "totalCommitContributions": user_data.contributions_collection.total_commit_contributions,
-                "totalPullRequestContributions": user_data.contributions_collection.total_pull_request_contributions,
-                "totalIssueContributions": user_data.contributions_collection.total_issue_contributions,
-                "totalPullRequestReviewContributions": user_data.contributions_collection.total_pull_request_review_contributions,
+                "totalCommitContributions": cc.total_commit_contributions,
+                "totalPullRequestContributions": cc.total_pull_request_contributions,
+                "totalIssueContributions": cc.total_issue_contributions,
+                "totalPullRequestReviewContributions": cc.total_pull_request_review_contributions,
             }
 
             aggregates = compute_user_aggregates(
@@ -96,9 +93,9 @@ class SyncService:
                 current_streak=current_streak,
                 longest_streak=longest_streak,
                 contribution_count=contribution_count,
-                repo_count=repo_count,
-                total_stars=total_stars,
-                total_forks=total_forks,
+                repo_count=len(repositories),
+                total_stars=sum(r.stars for r in repositories),
+                total_forks=sum(r.forks for r in repositories),
             )
 
             # Atomic database update - all or nothing
@@ -150,7 +147,7 @@ class SyncService:
                     SyncStateRepository.update_success(session, username)
 
                     session.commit()
-                except Exception as e:
+                except Exception:
                     session.rollback()
                     raise
 
@@ -208,13 +205,8 @@ class SyncService:
         repositories = []
 
         for repo in user_data.repositories.nodes:
-            primary_lang = None
-            if repo.primary_language:
-                primary_lang = repo.primary_language.name
-
-            pushed_at = None
-            if repo.pushed_at:
-                pushed_at = datetime.fromisoformat(repo.pushed_at.replace("Z", "+00:00"))
+            primary_lang = repo.primary_language.name if repo.primary_language else None
+            pushed_at = datetime.fromisoformat(repo.pushed_at.replace("Z", "+00:00")) if repo.pushed_at else None
 
             repositories.append(
                 Repository(
@@ -235,29 +227,29 @@ class SyncService:
     async def _fetch_languages(self, username: str, repositories: list[Repository]) -> list[LanguageTotal]:
         """Fetch detailed language data for all repositories."""
         language_totals: dict[str, int] = {}
-        
+
         for repo in repositories:
             if repo.is_fork:
                 # Skip forks to avoid inflating language stats
                 continue
-                
+
             try:
                 # Fetch language breakdown for this repository
                 lang_data = await self.github_client.fetch_repository_languages(
                     repo.owner, repo.name
                 )
-                
+
                 if lang_data and lang_data.edges:
                     for lang_edge in lang_data.edges:
                         lang_name = lang_edge.node.get("name")
                         byte_count = lang_edge.size
-                        
+
                         if lang_name:
                             language_totals[lang_name] = language_totals.get(lang_name, 0) + byte_count
             except Exception as e:
                 logger.warning(f"Failed to fetch languages for {repo.owner}/{repo.name}: {e}")
                 continue
-        
+
         # Convert to LanguageTotal models
         now = datetime.now()
         return [

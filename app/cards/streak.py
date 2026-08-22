@@ -27,14 +27,10 @@ def generate_streak_card(
     def format_num(n: int) -> str:
         return f"{n:,}"
 
-    last_updated = ""
-    if last_sync:
-        last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC")
+    last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else ""
 
     # Calculate progress bar width (0-100%)
-    progress = 0
-    if longest_streak > 0:
-        progress = min(100, (current_streak / longest_streak) * 100)
+    progress = min(100, (current_streak / longest_streak) * 100) if longest_streak > 0 else 0
 
     svg = f"""
 <svg width="500" height="200" xmlns="http://www.w3.org/2000/svg">

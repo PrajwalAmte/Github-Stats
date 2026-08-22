@@ -1,7 +1,7 @@
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -13,7 +13,7 @@ _SessionLocal: sessionmaker[Session] | None = None
 
 def get_engine() -> Engine:
     """Get or create SQLAlchemy engine for database connections.
-    
+
     SQLAlchemy handles connection pooling and parameters better than raw psycopg,
     especially in serverless environments like Vercel.
     """
@@ -22,7 +22,7 @@ def get_engine() -> Engine:
         url = settings.database_url
         if url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-        
+
         _engine = create_engine(
             url,
             echo=False,
@@ -48,13 +48,8 @@ def get_session() -> sessionmaker[Session]:
 
 @contextmanager
 def get_db() -> Generator:
-    """Context manager for database operations using SQLAlchemy.
-    
-    Returns a SQLAlchemy Session that can be used for ORM operations.
-    For raw SQL, use session.execute(text("SELECT ..."))
-    """
-    SessionLocal = get_session()
-    session = SessionLocal()
+    """Context manager for database sessions."""
+    session = get_session()()
     try:
         yield session
     finally:

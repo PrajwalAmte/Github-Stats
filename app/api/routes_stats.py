@@ -192,10 +192,8 @@ def get_user_history(
         HistoryResponse with daily snapshots
     """
     # Default to last 30 days
-    if not to_date:
-        to_date = date.today()
-    if not from_date:
-        from_date = to_date - timedelta(days=30)
+    to_date = to_date or date.today()
+    from_date = from_date or (to_date - timedelta(days=30))
 
     # Limit range to 365 days
     if (to_date - from_date).days > 365:

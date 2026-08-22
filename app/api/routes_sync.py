@@ -29,14 +29,9 @@ def verify_sync_secret(authorization: Annotated[str | None, Header()] = None) ->
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
 
-    # Expected format: "Bearer <secret>"
     parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
-
-    token = parts[1]
-    if token != settings.sync_secret:
-        raise HTTPException(status_code=401, detail="Invalid sync secret")
+    if len(parts) != 2 or parts[0].lower() != "bearer" or parts[1] != settings.sync_secret:
+        raise HTTPException(status_code=401, detail="Invalid authorization format or secret")
 
 
 @router.post("/{username}", response_model=SyncResponse)
