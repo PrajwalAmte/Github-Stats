@@ -22,12 +22,12 @@ def get_profile_card(username: str) -> Response:
     Returns:
         SVG image response with profile statistics
     """
-    with get_db() as conn:
-        user = UserRepository.get_by_username(conn, username)
+    with get_db() as session:
+        user = UserRepository.get_by_username(session, username)
         if not user:
             raise HTTPException(status_code=404, detail=f"User {username} not found")
 
-        sync_state = SyncStateRepository.get(conn, username)
+        sync_state = SyncStateRepository.get(session, username)
 
     svg_content = generate_profile_card(
         username=user.username,
@@ -62,12 +62,12 @@ def get_streak_card(username: str) -> Response:
     Returns:
         SVG image response with streak statistics
     """
-    with get_db() as conn:
-        user = UserRepository.get_by_username(conn, username)
+    with get_db() as session:
+        user = UserRepository.get_by_username(session, username)
         if not user:
             raise HTTPException(status_code=404, detail=f"User {username} not found")
 
-        sync_state = SyncStateRepository.get(conn, username)
+        sync_state = SyncStateRepository.get(session, username)
 
     svg_content = generate_streak_card(
         username=user.username,

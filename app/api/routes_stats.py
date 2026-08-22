@@ -97,12 +97,12 @@ def get_user_stats(username: str) -> UserStatsResponse:
     Returns:
         UserStatsResponse with current statistics and metadata
     """
-    with get_db() as conn:
-        user = UserRepository.get_by_username(conn, username)
+    with get_db() as session:
+        user = UserRepository.get_by_username(session, username)
         if not user:
             raise HTTPException(status_code=404, detail=f"User {username} not found")
 
-        sync_state = SyncStateRepository.get(conn, username)
+        sync_state = SyncStateRepository.get(session, username)
 
     return UserStatsResponse(
         data=UserStatsData(
@@ -140,15 +140,15 @@ def get_user_languages(username: str) -> LanguagesResponse:
     Returns:
         LanguagesResponse with language statistics
     """
-    with get_db() as conn:
+    with get_db() as session:
         # Verify user exists
-        user = UserRepository.get_by_username(conn, username)
+        user = UserRepository.get_by_username(session, username)
         if not user:
             raise HTTPException(status_code=404, detail=f"User {username} not found")
 
         # Get language totals
-        language_totals = LanguageRepository.get_all_for_user(conn, username)
-        sync_state = SyncStateRepository.get(conn, username)
+        language_totals = LanguageRepository.get_all_for_user(session, username)
+        sync_state = SyncStateRepository.get(session, username)
 
     # Calculate percentages
     lang_data = [
@@ -204,14 +204,14 @@ def get_user_history(
             detail="Date range cannot exceed 365 days",
         )
 
-    with get_db() as conn:
+    with get_db() as session:
         # Verify user exists
-        user = UserRepository.get_by_username(conn, username)
+        user = UserRepository.get_by_username(session, username)
         if not user:
             raise HTTPException(status_code=404, detail=f"User {username} not found")
 
-        snapshots = SnapshotRepository.get_range(conn, username, from_date, to_date)
-        sync_state = SyncStateRepository.get(conn, username)
+        snapshots = SnapshotRepository.get_range(session, username, from_date, to_date)
+        sync_state = SyncStateRepository.get(session, username)
 
     snapshot_data = [
         SnapshotData(

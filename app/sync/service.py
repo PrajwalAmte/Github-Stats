@@ -6,9 +6,10 @@ from datetime import date, datetime
 
 from app.config import settings
 from app.db.connection import get_db
-from app.db.models import ContributionDay, Repository, User
+from app.db.models import ContributionDay, LanguageTotal, Repository, User
 from app.db.repositories import (
     ContributionRepository,
+    LanguageRepository,
     RepositoryRepository,
     SnapshotRepository,
     SyncStateRepository,
@@ -73,6 +74,7 @@ class SyncService:
             # Process and validate data
             contributions = self._extract_contributions(user_data)
             repositories = self._extract_repositories(user_data, username)
+            languages = await self._fetch_languages(username, repositories)
 
             # Calculate aggregates
             current_streak, longest_streak = calculate_streaks(contributions)
@@ -111,6 +113,9 @@ class SyncService:
                         for d, c in contributions
                     ]
                     ContributionRepository.upsert_many(session, contribution_models)
+
+                    # Upsert languages
+                    LanguageRepository.upsert_many(session, languages)
 
                     # Update user with aggregates
                     user = User(
@@ -226,6 +231,43 @@ class SyncService:
             )
 
         return repositories
+
+    async def _fetch_languages(self, username: str, repositories: list[Repository]) -> list[LanguageTotal]:
+        """Fetch detailed language data for all repositories."""
+        language_totals: dict[str, int] = {}
+        
+        for repo in repositories:
+            if repo.is_fork:
+                # Skip forks to avoid inflating language stats
+                continue
+                
+            try:
+                # Fetch language breakdown for this repository
+                lang_data = await self.github_client.fetch_repo_languages(
+                    repo.owner, repo.name
+                )
+                
+                if lang_data and lang_data.languages:
+                    for lang_edge in lang_data.languages.edges:
+                        lang_name = lang_edge.node.name
+                        byte_count = lang_edge.size
+                        
+                        language_totals[lang_name] = language_totals.get(lang_name, 0) + byte_count
+            except Exception as e:
+                logger.warning(f"Failed to fetch languages for {repo.owner}/{repo.name}: {e}")
+                continue
+        
+        # Convert to LanguageTotal models
+        now = datetime.now()
+        return [
+            LanguageTotal(
+                username=username,
+                language=lang_name,
+                byte_count=byte_count,
+                updated_at=now
+            )
+            for lang_name, byte_count in language_totals.items()
+        ]
 
 
 # Singleton instance
