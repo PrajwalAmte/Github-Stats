@@ -1,0 +1,43 @@
+"""Custom exceptions for GitHub API interactions."""
+
+
+class GithubApiError(Exception):
+    """Base exception for GitHub API errors."""
+
+    pass
+
+
+class GithubRateLimitError(GithubApiError):
+    """GitHub API rate limit exceeded."""
+
+    pass
+
+
+class GithubNotFoundError(GithubApiError):
+    """GitHub user or resource not found."""
+
+    pass
+
+
+class GithubAuthenticationError(GithubApiError):
+    """GitHub authentication failed."""
+
+    pass
+
+
+class SyncAlreadyRunningError(Exception):
+    """Synchronization is already in progress for this user."""
+
+    pass
+
+
+class DatabaseError(Exception):
+    """Database operation failed."""
+
+    pass
+
+
+class ValidationError(Exception):
+    """Request validation failed."""
+
+    pass

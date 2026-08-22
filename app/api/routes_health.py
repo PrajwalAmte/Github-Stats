@@ -1,0 +1,83 @@
+"""Health and readiness check endpoints."""
+
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+from app.db.connection import get_db
+
+router = APIRouter(tags=["health"])
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+
+    status: str
+    message: str
+
+
+class ReadyResponse(BaseModel):
+    """Readiness check response."""
+
+    status: str
+    database: str
+    data_available: bool
+
+
+@router.get("/health", response_model=HealthResponse)
+def health_check() -> HealthResponse:
+    """
+    Basic health check - application is responding.
+
+    Returns 200 if the application process can handle requests.
+    """
+    return HealthResponse(
+        status="ok",
+        message="Service is healthy",
+    )
+
+
+@router.get("/ready", response_model=ReadyResponse)
+def readiness_check() -> ReadyResponse:
+    """
+    Readiness check - application can serve useful data.
+
+    Checks:
+    - Database connectivity
+    - At least one synchronized user exists
+
+    Returns 200 if ready to serve traffic, 503 otherwise.
+    """
+    db_status = "unknown"
+    data_available = False
+
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                # Check database connectivity
+                cur.execute("SELECT 1")
+                db_status = "connected"
+
+                # Check if any data exists
+                cur.execute("SELECT COUNT(*) FROM users")
+                count = cur.fetchone()
+                data_available = count[0] > 0 if count else False
+
+        if db_status == "connected" and data_available:
+            return ReadyResponse(
+                status="ready",
+                database=db_status,
+                data_available=data_available,
+            )
+        else:
+            return ReadyResponse(
+                status="not_ready",
+                database=db_status,
+                data_available=data_available,
+            )
+
+    except Exception as e:
+        return ReadyResponse(
+            status="error",
+            database=f"error: {str(e)}",
+            data_available=False,
+        )
