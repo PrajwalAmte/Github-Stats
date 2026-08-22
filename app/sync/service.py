@@ -243,16 +243,17 @@ class SyncService:
                 
             try:
                 # Fetch language breakdown for this repository
-                lang_data = await self.github_client.fetch_repo_languages(
+                lang_data = await self.github_client.fetch_repository_languages(
                     repo.owner, repo.name
                 )
                 
-                if lang_data and lang_data.languages:
-                    for lang_edge in lang_data.languages.edges:
-                        lang_name = lang_edge.node.name
+                if lang_data and lang_data.edges:
+                    for lang_edge in lang_data.edges:
+                        lang_name = lang_edge.node.get("name")
                         byte_count = lang_edge.size
                         
-                        language_totals[lang_name] = language_totals.get(lang_name, 0) + byte_count
+                        if lang_name:
+                            language_totals[lang_name] = language_totals.get(lang_name, 0) + byte_count
             except Exception as e:
                 logger.warning(f"Failed to fetch languages for {repo.owner}/{repo.name}: {e}")
                 continue
