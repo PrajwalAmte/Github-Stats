@@ -16,9 +16,10 @@ def get_pool() -> ConnectionPool:
     if _pool is None:
         _pool = ConnectionPool(
             conninfo=settings.database_url,
-            min_size=1,
-            max_size=10,
-            timeout=30,
+            min_size=0,
+            max_size=5,
+            timeout=10,
+            connect_kwargs={"connect_timeout": 10},
         )
     return _pool
 
