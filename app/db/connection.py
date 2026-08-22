@@ -19,14 +19,17 @@ def get_engine() -> Engine:
     """
     global _engine
     if _engine is None:
-        # Create engine with minimal pool size for serverless
+        url = settings.database_url
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        
         _engine = create_engine(
-            settings.database_url,
+            url,
             echo=False,
             pool_size=1,
             max_overflow=0,
-            pool_pre_ping=True,  # Test connections before using
-            pool_recycle=300,  # Recycle connections every 5 minutes
+            pool_pre_ping=True,
+            pool_recycle=300,
             connect_args={
                 "connect_timeout": 10,
             },

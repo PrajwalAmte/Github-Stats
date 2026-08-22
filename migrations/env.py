@@ -16,8 +16,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set database URL from settings
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Set database URL from settings (convert to psycopg3 driver format)
+db_url = settings.database_url
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:
@@ -39,7 +42,10 @@ def run_migrations_online() -> None:
     from sqlalchemy import engine_from_config, pool
 
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.database_url
+    db_url = settings.database_url
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    configuration["sqlalchemy.url"] = db_url
 
     connectable = engine_from_config(
         configuration,
