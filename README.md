@@ -6,9 +6,20 @@
 
 Generate dynamic GitHub statistics cards for your profile README. Fast, reliable, and free to deploy.
 
-![Profile Stats](https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/profile.svg)
-![Contribution Streak](https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/streak.svg)
-![Top Languages](https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/languages.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/profile.svg?t=1">
+  <img alt="Profile Stats" src="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/profile.svg?t=1" width="500">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/streak.svg?t=1">
+  <img alt="Contribution Streak" src="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/streak.svg?t=1" width="500">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/languages.svg?t=1">
+  <img alt="Top Languages" src="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/languages.svg?t=1" width="500">
+</picture>
 
 ## Usage
 
