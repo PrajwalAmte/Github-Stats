@@ -51,9 +51,9 @@ def generate_overview_card(
     parts += terminal_chrome(WIDTH, f"guest@github:~$ overview --user {username}", CHROME_H)
 
     content_top = CHROME_H + 26
-    divider_left_x = 430
-    divider_right_x = 748
-    left_x, left_end = 24, divider_left_x - 20
+    divider_left_x = 402
+    divider_right_x = 690
+    left_x, left_end = 24, 350
     center_x0 = divider_left_x + 18
     right_x0 = divider_right_x + 20
 
@@ -118,7 +118,7 @@ def generate_overview_card(
                 f"{esc(lang_name)}</text>"
             )
             parts += block_meter(
-                right_x0 + 116,
+                right_x0 + 190,
                 y - 11,
                 12,
                 (percentage / 100) * 12,
