@@ -45,7 +45,9 @@ def generate_profile_card(
         ("streak --longest", f"{longest_streak}d"),
     ]
 
-    parts: list[str] = [f'<svg width="{WIDTH}" height="{HEIGHT}" xmlns="http://www.w3.org/2000/svg">']
+    parts: list[str] = [
+        f'<svg width="{WIDTH}" height="{HEIGHT}" xmlns="http://www.w3.org/2000/svg">'
+    ]
     parts += card_frame(WIDTH, HEIGHT)
     parts += terminal_chrome(WIDTH, f"guest@github:~$ stats --user {username}", CHROME_H)
 

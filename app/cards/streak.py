@@ -28,7 +28,9 @@ def generate_streak_card(
     last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else "never"
     filled = (current_streak / longest_streak) * SEGMENTS if longest_streak > 0 else 0
 
-    parts: list[str] = [f'<svg width="{WIDTH}" height="{HEIGHT}" xmlns="http://www.w3.org/2000/svg">']
+    parts: list[str] = [
+        f'<svg width="{WIDTH}" height="{HEIGHT}" xmlns="http://www.w3.org/2000/svg">'
+    ]
     parts += card_frame(WIDTH, HEIGHT)
     parts += terminal_chrome(WIDTH, f"guest@github:~$ streak --user {username}", CHROME_H)
 

@@ -22,10 +22,7 @@ COLORS = {
     "dot_green": "#57ab5a",
 }
 
-FONT_STACK = (
-    "'JetBrains Mono','Fira Code',ui-monospace,SFMono-Regular,"
-    "Menlo,Consolas,monospace"
-)
+FONT_STACK = "'JetBrains Mono','Fira Code',ui-monospace,SFMono-Regular," "Menlo,Consolas,monospace"
 
 # GitHub linguist colors — kept as-is, this mapping is the one place
 # a *non*-monospace-green color is correct, since language identity

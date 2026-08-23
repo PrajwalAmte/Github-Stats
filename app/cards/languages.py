@@ -31,9 +31,13 @@ def generate_languages_card(
     row_count = max(len(top_languages), 1)
     height = ROW_Y0 + row_count * ROW_H + 34
 
-    parts: list[str] = [f'<svg width="{WIDTH}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    parts: list[str] = [
+        f'<svg width="{WIDTH}" height="{height}" xmlns="http://www.w3.org/2000/svg">'
+    ]
     parts += card_frame(WIDTH, height)
-    parts += terminal_chrome(WIDTH, f"guest@github:~$ languages --user {username} --top 6", CHROME_H)
+    parts += terminal_chrome(
+        WIDTH, f"guest@github:~$ languages --user {username} --top 6", CHROME_H
+    )
 
     if not top_languages:
         parts.append(
@@ -48,7 +52,9 @@ def generate_languages_card(
                 f'<text x="40" y="{y}" {font(12)} fill="{COLORS["text"]}">{lang_name}</text>'
             )
             filled = (percentage / 100) * SEGMENTS
-            parts += block_meter(METER_X, y - 12, SEGMENTS, filled, seg_w=8, gap=3, seg_h=10, color=color)
+            parts += block_meter(
+                METER_X, y - 12, SEGMENTS, filled, seg_w=8, gap=3, seg_h=10, color=color
+            )
             parts.append(
                 f'<text x="{WIDTH - 24}" y="{y}" text-anchor="end" {font(12, 600)} '
                 f'fill="{COLORS["text"]}">{percentage:.1f}%</text>'

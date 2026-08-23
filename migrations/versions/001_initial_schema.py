@@ -5,12 +5,13 @@ Revises:
 Create Date: 2026-08-22
 
 """
+
 from collections.abc import Sequence
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '001'
+revision: str = "001"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -69,7 +70,9 @@ def upgrade() -> None:
             PRIMARY KEY (username, date)
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_contribution_days_username_date ON contribution_days(username, date)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_contribution_days_username_date ON contribution_days(username, date)"
+    )
 
     # language_totals table
     op.execute("""
@@ -97,7 +100,9 @@ def upgrade() -> None:
             PRIMARY KEY (username, date)
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_daily_snapshots_username_date ON daily_snapshots(username, date)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_daily_snapshots_username_date ON daily_snapshots(username, date)"
+    )
 
     # sync_state table
     op.execute("""
