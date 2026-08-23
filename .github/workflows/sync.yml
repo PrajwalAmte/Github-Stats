@@ -35,9 +35,19 @@ jobs:
           API_URL="${{ secrets.API_URL }}"
           API_URL="${API_URL%/}"
 
-          RESPONSE=$(curl -sS -L --max-redirs 5 -w "\n%{http_code}" -X POST \
+          set +e
+          RESPONSE=$(curl -sS -L --max-redirs 5 --connect-timeout 10 --max-time 45 \
+            --retry 2 --retry-all-errors -w "\n%{http_code}" -X POST \
             "${API_URL}/v1/sync/${USERNAME}" \
             -H "Authorization: Bearer ${{ secrets.SYNC_SECRET }}")
+          CURL_EXIT=$?
+          set -e
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::curl failed with exit code $CURL_EXIT while calling ${API_URL}/v1/sync/${USERNAME}"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
