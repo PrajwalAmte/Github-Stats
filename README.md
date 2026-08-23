@@ -7,18 +7,8 @@
 Generate dynamic GitHub statistics cards for your profile README. Fast, reliable, and free to deploy.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/profile.svg?t=1">
-  <img alt="Profile Stats" src="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/profile.svg?t=1" width="500">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/streak.svg?t=1">
-  <img alt="Contribution Streak" src="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/streak.svg?t=1" width="500">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/languages.svg?t=1">
-  <img alt="Top Languages" src="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/languages.svg?t=1" width="500">
+  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/overview.svg?t=1">
+  <img alt="GitHub Overview" src="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/overview.svg?t=1">
 </picture>
 
 ## Usage
@@ -26,9 +16,10 @@ Generate dynamic GitHub statistics cards for your profile README. Fast, reliable
 ### Add to Your README
 
 ```markdown
-![Stats](https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/profile.svg)
-![Streak](https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/streak.svg)
-![Languages](https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/languages.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
+  <img alt="GitHub Overview" src="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
+</picture>
 ```
 
 ### API Endpoints
@@ -40,6 +31,7 @@ GET /v1/users/{username}/languages
 GET /v1/users/{username}/history
 
 # SVG Cards
+GET /v1/users/{username}/cards/overview.svg
 GET /v1/users/{username}/cards/profile.svg
 GET /v1/users/{username}/cards/streak.svg
 GET /v1/users/{username}/cards/languages.svg
@@ -112,9 +104,10 @@ Or trigger from: GitHub Actions tab > Sync GitHub Stats > Run workflow
 Replace `YOUR-DEPLOYMENT-URL` and `YOUR-USERNAME`:
 
 ```markdown
-![Stats](https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/profile.svg)
-![Streak](https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/streak.svg)
-![Languages](https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/languages.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
+  <img alt="GitHub Overview" src="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
+</picture>
 ```
 
 ## Troubleshooting

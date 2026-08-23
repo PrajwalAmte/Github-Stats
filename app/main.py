@@ -81,6 +81,7 @@ def root():
             "languages": "/v1/users/{username}/languages",
             "profile_card": "/v1/users/{username}/cards/profile.svg",
             "streak_card": "/v1/users/{username}/cards/streak.svg",
+            "overview_card": "/v1/users/{username}/cards/overview.svg",
         },
     }
 
