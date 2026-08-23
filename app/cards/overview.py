@@ -51,16 +51,18 @@ def generate_overview_card(
     parts += terminal_chrome(WIDTH, f"guest@github:~$ overview --user {username}", CHROME_H)
 
     content_top = CHROME_H + 26
-    left_x, left_end = 24, 390
-    center_x0 = 430
-    right_x0 = 760
+    divider_left_x = 430
+    divider_right_x = 748
+    left_x, left_end = 24, divider_left_x - 20
+    center_x0 = divider_left_x + 18
+    right_x0 = divider_right_x + 20
 
     parts.append(
-        f'<line x1="412" y1="{CHROME_H + 14}" x2="412" y2="{HEIGHT - 34}" '
+        f'<line x1="{divider_left_x}" y1="{CHROME_H + 14}" x2="{divider_left_x}" y2="{HEIGHT - 34}" '
         f'stroke="{COLORS["border"]}"/>'
     )
     parts.append(
-        f'<line x1="742" y1="{CHROME_H + 14}" x2="742" y2="{HEIGHT - 34}" '
+        f'<line x1="{divider_right_x}" y1="{CHROME_H + 14}" x2="{divider_right_x}" y2="{HEIGHT - 34}" '
         f'stroke="{COLORS["border"]}"/>'
     )
 
@@ -87,7 +89,7 @@ def generate_overview_card(
         f'<text x="{center_x0}" y="{content_top + 56}" {font(11)} fill="{COLORS["dim"]}">current</text>'
     )
     parts.append(
-        f'<text x="{720}" y="{content_top + 36}" text-anchor="end" {font(24, 600)} '
+        f'<text x="{divider_right_x - 24}" y="{content_top + 36}" text-anchor="end" {font(24, 600)} '
         f'fill="{COLORS["text"]}">best {fmt(longest_streak)}d</text>'
     )
     parts += block_meter(center_x0, content_top + 72, 16, streak_ratio, seg_w=12, gap=5, seg_h=10)
@@ -116,7 +118,7 @@ def generate_overview_card(
                 f"{esc(lang_name)}</text>"
             )
             parts += block_meter(
-                right_x0 + 130,
+                right_x0 + 116,
                 y - 11,
                 12,
                 (percentage / 100) * 12,
