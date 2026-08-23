@@ -67,7 +67,7 @@ def get_overview_card(username: str) -> Response:
     languages = []
     if total_bytes > 0:
         languages = [
-            (lang.language, (lang.byte_count / total_bytes) * 100) for lang in language_totals[:4]
+            (lang.language, (lang.byte_count / total_bytes) * 100) for lang in language_totals[:6]
         ]
 
     svg_content = generate_overview_card(
