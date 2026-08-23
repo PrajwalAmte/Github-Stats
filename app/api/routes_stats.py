@@ -2,9 +2,10 @@
 
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
 
+from app.api.common import ensure_user_syncing
 from app.db.connection import get_db
 from app.db.repositories import (
     LanguageRepository,
@@ -84,7 +85,7 @@ class HistoryResponse(BaseModel):
 
 
 @router.get("/{username}/stats", response_model=UserStatsResponse)
-def get_user_stats(username: str) -> UserStatsResponse:
+def get_user_stats(username: str, background_tasks: BackgroundTasks) -> UserStatsResponse:
     """
     Get aggregated statistics for a GitHub user.
 
@@ -97,6 +98,29 @@ def get_user_stats(username: str) -> UserStatsResponse:
     Returns:
         UserStatsResponse with current statistics and metadata
     """
+    # Auto-trigger sync if user not found
+    if not ensure_user_syncing(username, background_tasks):
+        return UserStatsResponse(
+            data=UserStatsData(
+                username=username,
+                total_commits=0,
+                total_pull_requests=0,
+                total_issues=0,
+                total_reviews=0,
+                current_streak=0,
+                longest_streak=0,
+                contribution_count=0,
+                repository_count=0,
+                star_count=0,
+                fork_count=0,
+            ),
+            meta=StatsMetadata(
+                generated_at=datetime.now(),
+                last_sync=None,
+                sync_status="syncing",
+            ),
+        )
+
     with get_db() as session:
         user = UserRepository.get_by_username(session, username)
         if not user:
@@ -127,7 +151,7 @@ def get_user_stats(username: str) -> UserStatsResponse:
 
 
 @router.get("/{username}/languages", response_model=LanguagesResponse)
-def get_user_languages(username: str) -> LanguagesResponse:
+def get_user_languages(username: str, background_tasks: BackgroundTasks) -> LanguagesResponse:
     """
     Get language distribution for a GitHub user.
 
@@ -140,6 +164,17 @@ def get_user_languages(username: str) -> LanguagesResponse:
     Returns:
         LanguagesResponse with language statistics
     """
+    # Auto-trigger sync if user not found
+    if not ensure_user_syncing(username, background_tasks):
+        return LanguagesResponse(
+            data={"languages": []},
+            meta=StatsMetadata(
+                generated_at=datetime.now(),
+                last_sync=None,
+                sync_status="syncing",
+            ),
+        )
+
     with get_db() as session:
         # Verify user exists
         user = UserRepository.get_by_username(session, username)
@@ -172,6 +207,7 @@ def get_user_languages(username: str) -> LanguagesResponse:
 @router.get("/{username}/history", response_model=HistoryResponse)
 def get_user_history(
     username: str,
+    background_tasks: BackgroundTasks,
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
 ) -> HistoryResponse:
@@ -189,6 +225,17 @@ def get_user_history(
     Returns:
         HistoryResponse with daily snapshots
     """
+    # Auto-trigger sync if user not found
+    if not ensure_user_syncing(username, background_tasks):
+        return HistoryResponse(
+            data={"snapshots": []},
+            meta=StatsMetadata(
+                generated_at=datetime.now(),
+                last_sync=None,
+                sync_status="syncing",
+            ),
+        )
+
     # Default to last 30 days
     to_date = to_date or date.today()
     from_date = from_date or (to_date - timedelta(days=30))

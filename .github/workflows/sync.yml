@@ -37,17 +37,11 @@ jobs:
 
           set +e
           RESPONSE=$(curl -sS -L --max-redirs 5 --connect-timeout 10 --max-time 45 \
-            --retry 2 --retry-all-errors -w "\n%{http_code}" -X POST \
+            -w "\n%{http_code}" -X POST \
             "${API_URL}/v1/sync/${USERNAME}" \
             -H "Authorization: Bearer ${{ secrets.SYNC_SECRET }}")
           CURL_EXIT=$?
           set -e
-
-          if [ "$CURL_EXIT" -ne 0 ]; then
-            echo "::error::curl failed with exit code $CURL_EXIT while calling ${API_URL}/v1/sync/${USERNAME}"
-            echo "Response: $RESPONSE"
-            exit 1
-          fi
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
@@ -61,6 +55,12 @@ jobs:
           elif [ "$HTTP_CODE" -eq 409 ]; then
             echo "Sync already running for $USERNAME"
             exit 0
+          elif [ "$CURL_EXIT" -eq 28 ] && [ "$HTTP_CODE" = "000" ]; then
+            echo "::error::curl timed out with no response — likely the DB pool hang, not a transient network issue"
+            exit 1
+          elif [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::curl failed with exit code $CURL_EXIT while calling ${API_URL}/v1/sync/${USERNAME}"
+            exit 1
           else
             echo "Sync failed for $USERNAME"
             exit 1

@@ -1,5 +1,6 @@
 """Synchronization service - orchestrates GitHub data sync with database."""
 
+import asyncio
 import logging
 import secrets
 from datetime import date, datetime
@@ -22,6 +23,99 @@ from app.stats.streaks import calculate_contribution_total, calculate_streaks
 
 logger = logging.getLogger(__name__)
 
+# Cap on concurrent GitHub requests for per-repo language data. Bounded
+# rather than unlimited to stay well under GitHub's secondary rate
+# limits when an account has many repos.
+LANGUAGE_FETCH_CONCURRENCY = 5
+
+
+# Synchronous DB operations
+# These use the blocking SQLAlchemy session directly and are ONLY ever
+# called via asyncio.to_thread from async code below. Calling any of
+# these directly inside `async def` freezes the event loop for the
+# duration of the DB round-trip — that was the root cause of requests
+# (including unrelated ones on the same instance) hanging.
+
+
+def _acquire_lock_sync(username: str, lock_token: str) -> bool:
+    with get_db() as session:
+        acquired = SyncStateRepository.acquire_lock(
+            session, username, lock_token, settings.sync_lock_duration_seconds
+        )
+        session.commit()
+    return acquired
+
+
+def _persist_sync_sync(
+    username: str,
+    repositories: list[Repository],
+    contributions: list[tuple[date, int]],
+    languages: list[LanguageTotal],
+    user_row: User,
+    snapshot,
+) -> None:
+    with get_db() as session:
+        try:
+            RepositoryRepository.upsert_many(session, repositories)
+
+            contribution_models = [
+                ContributionDay(username=username, date=d, count=c) for d, c in contributions
+            ]
+            ContributionRepository.upsert_many(session, contribution_models)
+
+            LanguageRepository.upsert_many(session, languages)
+            UserRepository.upsert(session, user_row)
+            SnapshotRepository.upsert(session, snapshot)
+            SyncStateRepository.update_success(session, username)
+
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+
+def _record_failure_sync(username: str, error_msg: str) -> None:
+    with get_db() as session:
+        SyncStateRepository.update_failure(session, username, error_msg)
+        session.commit()
+
+
+def _release_lock_sync(username: str, lock_token: str) -> None:
+    with get_db() as session:
+        SyncStateRepository.release_lock(session, username, lock_token)
+        session.commit()
+
+
+def trigger_background_sync(username: str) -> None:
+    """Retired — replaced by `sync_user_background` below, wired through
+    FastAPI's BackgroundTasks instead of a detached Thread.
+
+    The Thread + new-event-loop version was unreliable specifically
+    because this runs on serverless: a function invocation is treated
+    as complete once the HTTP response is sent, and the platform can
+    freeze or kill the process at that point. A detached thread isn't
+    awaited by anything in the request lifecycle, so it could be
+    starved before doing any real work. BackgroundTasks IS part of the
+    ASGI lifecycle — Starlette runs it before the invocation is
+    signaled complete — which is what actually guarantees it runs.
+    """
+    raise NotImplementedError("Use sync_user_background via FastAPI BackgroundTasks instead")
+
+
+async def sync_user_background(username: str) -> None:
+    """Fire-and-forget sync for BackgroundTasks: reuses the singleton
+    sync_service (no second GithubClient, no second event loop) and
+    swallows errors since there's no request left to report them to —
+    they're already logged and recorded in sync_state by sync_user
+    itself.
+    """
+    try:
+        await sync_service.sync_user(username)
+    except SyncAlreadyRunningError:
+        pass  # another request is already syncing this user — fine
+    except Exception as e:
+        logger.warning(f"Background first-sync for {username} failed: {e}")
+
 
 class SyncService:
     """Synchronization service for GitHub data."""
@@ -39,11 +133,8 @@ class SyncService:
         3. Performs atomic database updates (inside transaction)
         4. Records success/failure state
 
-        Args:
-            username: GitHub username to sync
-
-        Returns:
-            Dict with sync result information
+        All DB work runs via asyncio.to_thread so it never blocks the
+        event loop that other requests on this instance depend on.
 
         Raises:
             SyncAlreadyRunningError: If sync is already in progress
@@ -51,18 +142,11 @@ class SyncService:
         """
         lock_token = secrets.token_hex(16)
 
-        # Acquire lock
-        with get_db() as session:
-            acquired = SyncStateRepository.acquire_lock(
-                session, username, lock_token, settings.sync_lock_duration_seconds
-            )
-            session.commit()
-
+        acquired = await asyncio.to_thread(_acquire_lock_sync, username, lock_token)
         if not acquired:
             raise SyncAlreadyRunningError(f"Sync already running for {username}")
 
         try:
-            # Fetch data from GitHub (outside transaction - no DB lock held)
             logger.info(f"Fetching GitHub data for {username}")
             github_data = await self.github_client.fetch_user_data(username)
 
@@ -71,12 +155,10 @@ class SyncService:
 
             user_data = github_data.user
 
-            # Process and validate data
             contributions = self._extract_contributions(user_data)
             repositories = self._extract_repositories(user_data, username)
             languages = await self._fetch_languages(username, repositories)
 
-            # Calculate aggregates
             current_streak, longest_streak = calculate_streaks(contributions)
             contribution_count = calculate_contribution_total(contributions)
 
@@ -98,58 +180,37 @@ class SyncService:
                 total_forks=sum(r.forks for r in repositories),
             )
 
-            # Atomic database update - all or nothing
-            with get_db() as session:
-                try:
-                    # Upsert repositories
-                    RepositoryRepository.upsert_many(session, repositories)
+            user = User(
+                username=username,
+                name=user_data.name,
+                avatar_url=user_data.avatar_url,
+                followers=user_data.followers.total_count,
+                following=user_data.following.total_count,
+                public_repos=len(repositories),
+                total_commits=aggregates.total_commits,
+                total_pull_requests=aggregates.total_pull_requests,
+                total_issues=aggregates.total_issues,
+                total_reviews=aggregates.total_reviews,
+                current_streak=aggregates.current_streak,
+                longest_streak=aggregates.longest_streak,
+                contribution_count=aggregates.contribution_count,
+                repository_count=aggregates.repository_count,
+                star_count=aggregates.star_count,
+                fork_count=aggregates.fork_count,
+                stats_computed_at=datetime.now(),
+                updated_at=datetime.now(),
+            )
+            snapshot = create_daily_snapshot(username, user, user_data.followers.total_count)
 
-                    # Upsert contribution days
-                    contribution_models = [
-                        ContributionDay(username=username, date=d, count=c)
-                        for d, c in contributions
-                    ]
-                    ContributionRepository.upsert_many(session, contribution_models)
-
-                    # Upsert languages
-                    LanguageRepository.upsert_many(session, languages)
-
-                    # Update user with aggregates
-                    user = User(
-                        username=username,
-                        name=user_data.name,
-                        avatar_url=user_data.avatar_url,
-                        followers=user_data.followers.total_count,
-                        following=user_data.following.total_count,
-                        public_repos=len(repositories),
-                        total_commits=aggregates.total_commits,
-                        total_pull_requests=aggregates.total_pull_requests,
-                        total_issues=aggregates.total_issues,
-                        total_reviews=aggregates.total_reviews,
-                        current_streak=aggregates.current_streak,
-                        longest_streak=aggregates.longest_streak,
-                        contribution_count=aggregates.contribution_count,
-                        repository_count=aggregates.repository_count,
-                        star_count=aggregates.star_count,
-                        fork_count=aggregates.fork_count,
-                        stats_computed_at=datetime.now(),
-                        updated_at=datetime.now(),
-                    )
-                    UserRepository.upsert(session, user)
-
-                    # Create daily snapshot
-                    snapshot = create_daily_snapshot(
-                        username, user, user_data.followers.total_count
-                    )
-                    SnapshotRepository.upsert(session, snapshot)
-
-                    # Mark sync as successful
-                    SyncStateRepository.update_success(session, username)
-
-                    session.commit()
-                except Exception:
-                    session.rollback()
-                    raise
+            await asyncio.to_thread(
+                _persist_sync_sync,
+                username,
+                repositories,
+                contributions,
+                languages,
+                user,
+                snapshot,
+            )
 
             logger.info(f"Successfully synced {username}")
 
@@ -161,32 +222,19 @@ class SyncService:
             }
 
         except GithubApiError as e:
-            # Record failure but don't modify user-facing data
             error_msg = str(e)
             logger.error(f"GitHub API error for {username}: {error_msg}")
-
-            with get_db() as session:
-                SyncStateRepository.update_failure(session, username, error_msg)
-                session.commit()
-
+            await asyncio.to_thread(_record_failure_sync, username, error_msg)
             raise
 
         except Exception as e:
-            # Unexpected error - record it
             error_msg = f"Unexpected error: {str(e)}"
             logger.error(f"Sync error for {username}: {error_msg}", exc_info=True)
-
-            with get_db() as session:
-                SyncStateRepository.update_failure(session, username, error_msg)
-                session.commit()
-
+            await asyncio.to_thread(_record_failure_sync, username, error_msg)
             raise
 
         finally:
-            # Always release the lock
-            with get_db() as session:
-                SyncStateRepository.release_lock(session, username, lock_token)
-                session.commit()
+            await asyncio.to_thread(_release_lock_sync, username, lock_token)
 
     def _extract_contributions(self, user_data) -> list[tuple[date, int]]:
         """Extract contribution days from GitHub user data."""
@@ -231,34 +279,44 @@ class SyncService:
     async def _fetch_languages(
         self, username: str, repositories: list[Repository]
     ) -> list[LanguageTotal]:
-        """Fetch detailed language data for all repositories."""
+        """Fetch detailed language data for non-fork repositories.
+
+        Runs with bounded concurrency instead of one repo at a time —
+        for an account with many repos, sequential awaits was likely
+        the main reason single sync requests ran long enough to
+        approach the 45s ceiling on their own.
+
+        NOT YET DONE: filtering to only repos whose `pushed_at` is
+        newer than the last successful sync, which was the original
+        design to avoid re-fetching unchanged repos every run. That
+        needs a read path into SyncStateRepository (or the user's
+        prior stats_computed_at) that I don't have visibility into —
+        share that module and this can be tightened further.
+        """
+        targets = [repo for repo in repositories if not repo.is_fork]
         language_totals: dict[str, int] = {}
+        semaphore = asyncio.Semaphore(LANGUAGE_FETCH_CONCURRENCY)
 
-        for repo in repositories:
-            if repo.is_fork:
-                # Skip forks to avoid inflating language stats
-                continue
-
-            try:
-                # Fetch language breakdown for this repository
-                lang_data = await self.github_client.fetch_repository_languages(
-                    repo.owner, repo.name
-                )
+        async def fetch_one(repo: Repository) -> None:
+            async with semaphore:
+                try:
+                    lang_data = await self.github_client.fetch_repository_languages(
+                        repo.owner, repo.name
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to fetch languages for {repo.owner}/{repo.name}: {e}")
+                    return
 
                 if lang_data and lang_data.edges:
                     for lang_edge in lang_data.edges:
                         lang_name = lang_edge.node.get("name")
-                        byte_count = lang_edge.size
-
                         if lang_name:
                             language_totals[lang_name] = (
-                                language_totals.get(lang_name, 0) + byte_count
+                                language_totals.get(lang_name, 0) + lang_edge.size
                             )
-            except Exception as e:
-                logger.warning(f"Failed to fetch languages for {repo.owner}/{repo.name}: {e}")
-                continue
 
-        # Convert to LanguageTotal models
+        await asyncio.gather(*(fetch_one(repo) for repo in targets))
+
         now = datetime.now()
         return [
             LanguageTotal(
