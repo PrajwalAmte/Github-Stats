@@ -2,8 +2,13 @@
 
 from datetime import datetime
 
-from .components import card_frame, cursor_blink, footer_comment, kv_row, terminal_chrome
-from .theme import COLORS
+from .components import (
+    card_frame,
+    cursor_blink,
+    footer_comment,
+    kv_row,
+    terminal_chrome,
+)
 
 WIDTH = 480
 HEIGHT = 300
@@ -29,7 +34,10 @@ def generate_profile_card(
     Args mirror the underlying `users` aggregate row directly — no
     derived formatting happens outside this function.
     """
-    fmt = lambda n: f"{n:,}"
+
+    def fmt(n: int) -> str:
+        return f"{n:,}"
+
     last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else "never"
 
     rows_left = [

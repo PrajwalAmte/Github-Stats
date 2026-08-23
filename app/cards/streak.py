@@ -2,7 +2,14 @@
 
 from datetime import datetime
 
-from .components import block_meter, card_frame, cursor_blink, font, footer_comment, terminal_chrome
+from .components import (
+    block_meter,
+    card_frame,
+    cursor_blink,
+    font,
+    footer_comment,
+    terminal_chrome,
+)
 from .theme import COLORS
 
 WIDTH = 480
@@ -24,7 +31,10 @@ def generate_streak_card(
     not a smooth progress bar — reads like a terminal load indicator
     rather than a generic dashboard widget.
     """
-    fmt = lambda n: f"{n:,}"
+
+    def fmt(n: int) -> str:
+        return f"{n:,}"
+
     last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else "never"
     filled = (current_streak / longest_streak) * SEGMENTS if longest_streak > 0 else 0
 
