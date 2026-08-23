@@ -39,7 +39,7 @@ def generate_overview_card(
         return f"{n:,}"
 
     last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else "never"
-    top_languages = languages[:4]
+    top_languages = languages[:6]
 
     parts: list[str] = [
         (
