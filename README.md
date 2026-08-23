@@ -4,7 +4,7 @@
 [![Sync](https://github.com/PrajwalAmte/Github-Stats/actions/workflows/sync.yml/badge.svg)](https://github.com/PrajwalAmte/Github-Stats/actions/workflows/sync.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Generate dynamic GitHub statistics cards for your profile README. Fast, reliable, and free to deploy.
+Dynamic GitHub statistics cards for your profile README — precomputed, cached at the edge, and never blocked on GitHub's API being up.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/PrajwalAmte/cards/overview.svg?t=1">
@@ -13,124 +13,68 @@ Generate dynamic GitHub statistics cards for your profile README. Fast, reliable
 
 ## Usage
 
-### Add to Your README
+Add this to your README, swapping in your username:
 
 ```markdown
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
-  <img alt="GitHub Overview" src="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://github-stats-green-one.vercel.app/v1/users/YOUR-USERNAME/cards/overview.svg">
+  <img alt="GitHub Overview" src="https://github-stats-green-one.vercel.app/v1/users/YOUR-USERNAME/cards/overview.svg">
 </picture>
 ```
 
-### API Endpoints
+That's it — cards render for any synced user on the hosted instance. No account, no setup.
 
-```bash
-# Statistics JSON
-GET /v1/users/{username}/stats
-GET /v1/users/{username}/languages
-GET /v1/users/{username}/history
+### Available cards
 
-# SVG Cards
+```text
 GET /v1/users/{username}/cards/overview.svg
 GET /v1/users/{username}/cards/profile.svg
 GET /v1/users/{username}/cards/streak.svg
 GET /v1/users/{username}/cards/languages.svg
 ```
 
-## Deployment Guide
+### Raw data, if you want it
 
-### Step 1: Create GitHub Token
-
-1. Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
-2. Generate token with scopes: `read:user`, `repo`
-3. Copy the token
-
-### Step 2: Setup Supabase Database
-
-1. Create account at [supabase.com](https://supabase.com) and create new project
-2. Go to Project Settings > Database > Connection string
-3. Copy **Transaction pooler** (port 6543, NOT 5432)
-4. Format: `postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres`
-
-### Step 3: Deploy to Vercel
-
-```bash
-# Clone repository
-git clone https://github.com/PrajwalAmte/Github-Stats.git
-cd Github-Stats
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Setup database
-cp .env.example .env
-# Edit .env: add DATABASE_URL, GITHUB_TOKEN, generate SYNC_SECRET
-alembic upgrade head
-
-# Deploy
-npm install -g vercel
-vercel login
-vercel --prod
+```text
+GET /v1/users/{username}/stats
+GET /v1/users/{username}/languages
+GET /v1/users/{username}/history
 ```
 
-### Step 4: Configure Vercel
+---
 
-In Vercel dashboard > Settings > Environment Variables, add:
+## Architecture — and why it's reliable
 
-- `DATABASE_URL` - Your Supabase transaction pooler URL
-- `GITHUB_TOKEN` - Your GitHub token
-- `SYNC_SECRET` - Generate with `openssl rand -hex 32`
-
-Redeploy after adding variables.
-
-### Step 5: Setup Auto-Sync
-
-In GitHub repo > Settings > Secrets and variables > Actions, add:
-
-- `API_URL` - Your Vercel URL (e.g., `https://your-app.vercel.app`)
-- `SYNC_SECRET` - Same as Vercel
-
-### Step 6: Run First Sync
-
-```bash
-curl -X POST "https://your-app.vercel.app/v1/sync/YOUR_USERNAME" \
-  -H "Authorization: Bearer YOUR_SYNC_SECRET"
+```mermaid
+flowchart LR
+    A[GitHub] -->|scheduled sync| B[GitHub Actions]
+    B --> C[(Supabase Postgres)]
+    C --> D[API]
+    D --> E[README card]
 ```
 
-Or trigger from: GitHub Actions tab > Sync GitHub Stats > Run workflow
+The one rule everything else follows from: **a card request never talks to GitHub.** Stats are pulled on a schedule, precomputed, and written to Postgres. Every read — the JSON endpoints and the SVG cards — only ever queries that database.
 
-### Step 7: Add Cards to Your README
+What that buys you:
 
-Replace `YOUR-DEPLOYMENT-URL` and `YOUR-USERNAME`:
+| If this fails | What happens |
+|---|---|
+| GitHub is down or rate-limited | Cards keep rendering from the last successful sync |
+| A sync run crashes partway through | Nothing — writes are transactional, so a failed sync never leaves partial data |
+| Two syncs get triggered at once | The second is rejected (a lock prevents concurrent writes); it doesn't corrupt anything |
+| The scheduler misses a run | Data goes stale, not wrong — every response includes `last_sync` so staleness is visible, never silent |
 
-```markdown
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
-  <img alt="GitHub Overview" src="https://YOUR-DEPLOYMENT-URL/v1/users/YOUR-USERNAME/cards/overview.svg">
-</picture>
-```
+There's deliberately no cache layer beyond the CDN — Postgres already holds precomputed data, so a database read is fast enough on its own. One less service that can go down.
 
-## Troubleshooting
+---
 
-### Connection Issues
-- Use **Transaction pooler** URL (port 6543, ends with `.pooler.supabase.com`)
-- Verify environment variables in Vercel dashboard
+## Contributing
 
-### Sync Fails
-- Check `GITHUB_TOKEN` has `read:user` and `repo` scopes
-- Ensure database migrations ran: `alembic upgrade head`
-
-### Cards Not Showing
-- Run initial sync: `POST /v1/sync/{username}` with auth header
-- Verify `/ready` endpoint returns `data_available: true`
-
-### Actions Not Running
-- Check GitHub repo secrets: `API_URL` and `SYNC_SECRET`
-- Manually trigger workflow from Actions tab to test
+Issues and PRs welcome — bug fixes, new card designs, additional stats, anything. Open an issue first for larger changes so we can align on approach before you put the work in.
 
 ## Tech Stack
 
-Python 3.12 • FastAPI • PostgreSQL • SQLAlchemy • Supabase • Vercel
+Python 3.12 · FastAPI · PostgreSQL · SQLAlchemy · Supabase · Vercel
 
 ## License
 
