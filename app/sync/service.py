@@ -28,6 +28,13 @@ logger = logging.getLogger(__name__)
 # limits when an account has many repos.
 LANGUAGE_FETCH_CONCURRENCY = 5
 
+# Overall wall-clock cap on the language-fetch phase. Set comfortably
+# under the caller's request timeout (the GitHub Actions curl uses
+# --max-time 45) so a slow/large account times out on its own terms
+# with partial data, instead of the whole HTTP request hanging until
+# the caller gives up first.
+LANGUAGE_FETCH_BUDGET_SECONDS = 25
+
 
 # Synchronous DB operations
 # These use the blocking SQLAlchemy session directly and are ONLY ever
@@ -291,7 +298,11 @@ class SyncService:
         design to avoid re-fetching unchanged repos every run. That
         needs a read path into SyncStateRepository (or the user's
         prior stats_computed_at) that I don't have visibility into —
-        share that module and this can be tightened further.
+        share that module and this can be tightened further. That
+        filter is what actually bounds the *number* of calls; the
+        deadline below only bounds the *time*, so an account with
+        many repos still degrades to partial language data rather
+        than fixing the root cause.
         """
         targets = [repo for repo in repositories if not repo.is_fork]
         language_totals: dict[str, int] = {}
@@ -315,12 +326,32 @@ class SyncService:
                                 language_totals.get(lang_name, 0) + lang_edge.size
                             )
 
-        await asyncio.gather(*(fetch_one(repo) for repo in targets))
+        try:
+            # Overall budget for the whole phase, not per-call. Each
+            # individual call is already capped (see github/client.py),
+            # but with enough repos the batches still add up past the
+            # sync's real time budget — this caps the total instead.
+            # On timeout, whatever's already landed in language_totals
+            # stays; we return partial data rather than blocking the
+            # entire sync (and the HTTP response) indefinitely.
+            await asyncio.wait_for(
+                asyncio.gather(*(fetch_one(repo) for repo in targets)),
+                timeout=LANGUAGE_FETCH_BUDGET_SECONDS,
+            )
+        except TimeoutError:
+            logger.warning(
+                f"Language fetch for {username} exceeded "
+                f"{LANGUAGE_FETCH_BUDGET_SECONDS}s budget with {len(targets)} repos — "
+                f"returning partial results ({len(language_totals)} languages collected)"
+            )
 
         now = datetime.now()
         return [
             LanguageTotal(
-                username=username, language=lang_name, byte_count=byte_count, updated_at=now
+                username=username,
+                language=lang_name,
+                byte_count=byte_count,
+                updated_at=now,
             )
             for lang_name, byte_count in language_totals.items()
         ]
