@@ -6,14 +6,39 @@ meter. Centralizing these is what stops each card file from
 hand-rolling its own rects and font-family strings.
 """
 
+from datetime import datetime
 from xml.sax.saxutils import escape as _escape
 
-from .theme import COLORS, FONT_STACK
+from app.stats.models import LanguageShare
+
+from .theme import COLORS, FONT_STACK, LANGUAGE_COLORS
 
 
 def esc(value: object) -> str:
     """XML-escape any value dropped into SVG text content."""
     return _escape(str(value))
+
+
+def fmt(n: int) -> str:
+    return f"{n:,}"
+
+
+def updated_label(fetched_at: datetime) -> str:
+    return f"# updated {fetched_at.strftime('%Y-%m-%d %H:%M UTC')}"
+
+
+def language_color(lang: LanguageShare) -> str:
+    """GitHub's own linguist color when the API gave one, else our map."""
+    return lang.color or LANGUAGE_COLORS.get(lang.name, COLORS["accent_blue"])
+
+
+def svg_open(width: int, height: int) -> str:
+    """Root element with a viewBox, so the card scales down on narrow
+    screens instead of overflowing."""
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        'xmlns="http://www.w3.org/2000/svg">'
+    )
 
 
 def font(size: int, weight: int = 400) -> str:
@@ -87,7 +112,7 @@ def cursor_blink(x: int, y: int, height: int = 13) -> str:
     return f'<rect x="{x}" y="{y - height + 3}" width="7" height="{height}" fill="{COLORS["accent"]}" opacity="0.85"/>'
 
 
-def footer_comment(x_center: int, y: int, text: str) -> str:
+def footer_comment(x_center: float, y: int, text: str) -> str:
     return (
         f'<text x="{x_center}" y="{y}" text-anchor="middle" {font(10)} '
         f'fill="{COLORS["dim"]}">{esc(text)}</text>'

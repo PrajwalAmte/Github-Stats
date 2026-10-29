@@ -1,54 +1,36 @@
 """Consolidated wide SVG card for single-row README usage."""
 
-from datetime import datetime
+from app.stats.models import UserStats
 
 from .components import (
     block_meter,
     card_frame,
     cursor_blink,
     esc,
+    fmt,
     font,
     footer_comment,
     kv_row,
+    language_color,
+    svg_open,
     terminal_chrome,
+    updated_label,
 )
-from .theme import COLORS, LANGUAGE_COLORS
+from .theme import COLORS
 
 WIDTH = 1100
 HEIGHT = 260
 CHROME_H = 40
 
 
-def generate_overview_card(
-    username: str,
-    total_commits: int,
-    total_prs: int,
-    total_issues: int,
-    total_reviews: int,
-    star_count: int,
-    repo_count: int,
-    current_streak: int,
-    longest_streak: int,
-    total_contributions: int,
-    languages: list[tuple[str, float]],
-    last_sync: datetime | None = None,
-) -> str:
+def generate_overview_card(stats: UserStats) -> str:
     """Generate a single consolidated card that spans most README width."""
+    top_languages = stats.languages[:6]
+    current_streak, longest_streak = stats.current_streak, stats.longest_streak
 
-    def fmt(n: int) -> str:
-        return f"{n:,}"
-
-    last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else "never"
-    top_languages = languages[:6]
-
-    parts: list[str] = [
-        (
-            f'<svg width="{WIDTH}" height="{HEIGHT}" viewBox="0 0 {WIDTH} {HEIGHT}" '
-            'xmlns="http://www.w3.org/2000/svg">'
-        )
-    ]
+    parts: list[str] = [svg_open(WIDTH, HEIGHT)]
     parts += card_frame(WIDTH, HEIGHT)
-    parts += terminal_chrome(WIDTH, f"guest@github:~$ overview --user {username}", CHROME_H)
+    parts += terminal_chrome(WIDTH, f"guest@github:~$ overview --user {stats.username}", CHROME_H)
 
     content_top = CHROME_H + 26
     divider_left_x = 402
@@ -67,12 +49,12 @@ def generate_overview_card(
     )
 
     left_rows = [
-        ("commits --total", fmt(total_commits)),
-        ("pull-requests --total", fmt(total_prs)),
-        ("issues --total", fmt(total_issues)),
-        ("reviews --total", fmt(total_reviews)),
-        ("stars --sum", fmt(star_count)),
-        ("repos --count", fmt(repo_count)),
+        ("commits --total", fmt(stats.total_commits)),
+        ("pull-requests --total", fmt(stats.total_pull_requests)),
+        ("issues --total", fmt(stats.total_issues)),
+        ("reviews --total", fmt(stats.total_reviews)),
+        ("stars --sum", fmt(stats.star_count)),
+        ("repos --count", fmt(stats.repository_count)),
     ]
     for i, (label, value) in enumerate(left_rows):
         parts += kv_row(left_x, left_end, content_top + i * 24, label, value)
@@ -96,7 +78,7 @@ def generate_overview_card(
     parts.append(
         f'<text x="{center_x0}" y="{content_top + 108}" {font(12)} fill="{COLORS["dim"]}">'
         f'total contributions: <tspan fill="{COLORS["text"]}" font-weight="600">'
-        f'{fmt(total_contributions)}</tspan></text>'
+        f'{fmt(stats.contribution_count)}</tspan></text>'
     )
 
     parts.append(
@@ -109,19 +91,19 @@ def generate_overview_card(
         )
     else:
         row_h = 28
-        for i, (lang_name, percentage) in enumerate(top_languages):
+        for i, lang in enumerate(top_languages):
             y = content_top + 24 + i * row_h
-            color = LANGUAGE_COLORS.get(lang_name, COLORS["accent_blue"])
+            color = language_color(lang)
             parts.append(f'<circle cx="{right_x0 + 5}" cy="{y - 4}" r="4" fill="{color}"/>')
             parts.append(
                 f'<text x="{right_x0 + 16}" y="{y}" {font(12)} fill="{COLORS["text"]}">'
-                f"{esc(lang_name)}</text>"
+                f"{esc(lang.name)}</text>"
             )
             parts += block_meter(
                 right_x0 + 190,
                 y - 11,
                 12,
-                (percentage / 100) * 12,
+                (lang.percentage / 100) * 12,
                 seg_w=9,
                 gap=3,
                 seg_h=9,
@@ -129,11 +111,11 @@ def generate_overview_card(
             )
             parts.append(
                 f'<text x="{WIDTH - 20}" y="{y}" text-anchor="end" {font(12, 600)} '
-                f'fill="{COLORS["text"]}">{percentage:.1f}%</text>'
+                f'fill="{COLORS["text"]}">{lang.percentage:.1f}%</text>'
             )
 
     footer_y = HEIGHT - 16
-    parts.append(footer_comment(WIDTH / 2, footer_y, f"# synced {last_updated} · v1"))
+    parts.append(footer_comment(WIDTH / 2, footer_y, updated_label(stats.fetched_at)))
     parts.append(cursor_blink(30, footer_y))
 
     parts.append("</svg>")

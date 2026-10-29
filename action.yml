@@ -1,0 +1,75 @@
+name: GitHub Stats Cards
+description: Render GitHub stats SVG cards and commit them to your repository.
+author: PrajwalAmte
+branding:
+  icon: bar-chart-2
+  color: green
+
+inputs:
+  username:
+    description: GitHub username to render cards for.
+    default: ${{ github.repository_owner }}
+  token:
+    description: Token used to query the GitHub GraphQL API.
+    default: ${{ github.token }}
+  output-dir:
+    description: Directory (relative to the repo root) to write the SVGs into.
+    default: github-stats
+  cards:
+    description: Comma-separated cards to render (overview, profile, streak, languages).
+    default: overview,profile,streak,languages
+  history:
+    description: Record a daily snapshot of the stats in <output-dir>/history.json.
+    default: "true"
+  commit:
+    description: Commit and push the generated files if they changed.
+    default: "true"
+  commit-message:
+    description: Commit message used when committing the cards.
+    default: "chore: update GitHub stats cards"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install
+      shell: bash
+      run: python -m pip install --quiet -r "$GITHUB_ACTION_PATH/requirements.txt"
+
+    - name: Render cards
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        PYTHONPATH: ${{ github.action_path }}
+        INPUT_USERNAME: ${{ inputs.username }}
+        INPUT_OUTPUT_DIR: ${{ inputs.output-dir }}
+        INPUT_CARDS: ${{ inputs.cards }}
+        INPUT_HISTORY: ${{ inputs.history }}
+      run: |
+        args=()
+        if [ "$INPUT_HISTORY" != "true" ]; then args+=(--no-history); fi
+        python -m app.cli "$INPUT_USERNAME" \
+          --out "$GITHUB_WORKSPACE/$INPUT_OUTPUT_DIR" \
+          --cards "$INPUT_CARDS" \
+          "${args[@]}"
+
+    - name: Commit
+      if: inputs.commit == 'true'
+      shell: bash
+      env:
+        INPUT_OUTPUT_DIR: ${{ inputs.output-dir }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
+      run: |
+        cd "$GITHUB_WORKSPACE"
+        git add -- "$INPUT_OUTPUT_DIR"
+        if git diff --cached --quiet; then
+          echo "Cards unchanged; nothing to commit."
+          exit 0
+        fi
+        git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "$INPUT_COMMIT_MESSAGE"
+        git push

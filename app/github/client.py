@@ -1,4 +1,6 @@
+import itertools
 import logging
+import time
 
 import httpx
 
@@ -9,128 +11,115 @@ from app.exceptions import (
     GithubNotFoundError,
     GithubRateLimitError,
 )
-from app.github.models import GithubRepository, GithubUserResponse, RepositoryLanguages
-from app.github.queries import PAGINATED_REPOS_QUERY, REPO_LANGUAGES_QUERY, USER_QUERY
+from app.github.models import GithubUser, RepositoryConnection
+from app.github.queries import REPOS_PAGE_QUERY, USER_QUERY
 
 logger = logging.getLogger(__name__)
 
-# Connect fast-fail, generous-but-bounded read. 30s per call was fine
-# for a single request but multiplies badly across the dozens of
-# per-repo language calls one sync makes — tightened so a slow
-# individual call can't eat a disproportionate share of the sync's
-# overall time budget.
-_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
+# Round-robin start position shared across requests, so load spreads
+# over every configured token instead of draining the first one.
+_token_cycle = itertools.count()
 
 
 class GithubClient:
-    """GitHub GraphQL API client."""
+    """GitHub GraphQL API client.
 
-    def __init__(self, token: str | None = None, api_url: str | None = None):
-        self.token = token or settings.github_token
+    Opens a fresh connection pool per fetch rather than holding one on
+    the instance: serverless runtimes may back each invocation with a
+    different event loop, and a pooled client bound to a dead loop is
+    exactly the kind of intermittent failure this service exists to
+    avoid.
+    """
+
+    def __init__(self, tokens: list[str] | None = None, api_url: str | None = None):
+        self.tokens = tokens if tokens is not None else settings.github_tokens
         self.api_url = api_url or settings.github_api_url
-        self.headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-        }
-        # Created lazily on first use, not here — an AsyncClient bound
-        # to an event loop that doesn't exist yet (this constructor
-        # can run at import time, before any loop is running) risks
-        # "attached to a different event loop" errors in serverless
-        # environments where a fresh loop may back each invocation.
-        self._client: httpx.AsyncClient | None = None
 
-    def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = httpx.AsyncClient(timeout=_TIMEOUT)
-        return self._client
+    async def fetch_user(self, login: str) -> GithubUser:
+        """Fetch profile, contribution calendar and repositories (with
+        languages) for a user. Paginates repos up to settings.max_repo_pages."""
+        if not self.tokens:
+            raise GithubAuthenticationError("GITHUB_TOKEN is not configured")
 
-    async def aclose(self) -> None:
-        """Close the underlying connection pool. Call on shutdown."""
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
+        timeout = httpx.Timeout(settings.github_timeout_seconds, connect=3.0)
+        async with httpx.AsyncClient(timeout=timeout) as http:
+            started = page_started = time.monotonic()
+            data = await self._execute(http, USER_QUERY, {"login": login})
+            if not data.get("user"):
+                raise GithubNotFoundError(f"User {login} not found")
 
-    async def _execute_query(self, query: str, variables: dict) -> dict:
-        """Execute a GraphQL query, reusing one pooled connection
-        across all calls made by this client instance instead of
-        opening a fresh connection per call."""
-        client = self._get_client()
-        response = await client.post(
-            self.api_url,
-            json={"query": query, "variables": variables},
-            headers=self.headers,
-        )
+            user = GithubUser(**data["user"])
+
+            pages = 1
+            page_info = user.repositories.page_info
+            while page_info.has_next_page and pages < settings.max_repo_pages:
+                now = time.monotonic()
+                # Assume the next page takes as long as the last one.
+                if (now - started) + (now - page_started) > settings.github_soft_budget_seconds:
+                    break
+                page_started = now
+                data = await self._execute(
+                    http, REPOS_PAGE_QUERY, {"login": login, "cursor": page_info.end_cursor}
+                )
+                page = RepositoryConnection(**data["user"]["repositories"])
+                user.repositories.nodes.extend(page.nodes)
+                page_info = page.page_info
+                pages += 1
+
+            if page_info.has_next_page:
+                logger.info(
+                    f"{login} has {user.repositories.total_count} repos; "
+                    f"using the top {len(user.repositories.nodes)} by stars"
+                )
+
+        return user
+
+    async def _execute(self, http: httpx.AsyncClient, query: str, variables: dict) -> dict:
+        """Run a query, rotating through tokens on rate-limit/auth failures."""
+        start = next(_token_cycle)
+        last_error: GithubApiError | None = None
+
+        for i in range(len(self.tokens)):
+            token = self.tokens[(start + i) % len(self.tokens)]
+            try:
+                return await self._execute_with_token(http, token, query, variables)
+            except (GithubRateLimitError, GithubAuthenticationError) as e:
+                logger.warning(f"Token #{(start + i) % len(self.tokens)} unusable: {e}")
+                last_error = e
+
+        assert last_error is not None
+        raise last_error
+
+    async def _execute_with_token(
+        self, http: httpx.AsyncClient, token: str, query: str, variables: dict
+    ) -> dict:
+        try:
+            response = await http.post(
+                self.api_url,
+                json={"query": query, "variables": variables},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        except httpx.HTTPError as e:
+            raise GithubApiError(f"GitHub request failed: {type(e).__name__}") from e
 
         if response.status_code == 401:
             raise GithubAuthenticationError("GitHub authentication failed")
-        if response.status_code == 403:
+        if response.status_code in (403, 429):
             raise GithubRateLimitError("GitHub API rate limit exceeded")
-        if response.status_code >= 500:
-            raise GithubApiError(f"GitHub API server error: {response.status_code}")
+        if response.status_code >= 400:
+            raise GithubApiError(f"GitHub API error: {response.status_code}")
 
-        data = response.json()
+        payload = response.json()
+        errors = payload.get("errors") or []
+        if errors:
+            error = errors[0]
+            if error.get("type") == "RATE_LIMITED":
+                raise GithubRateLimitError(error.get("message", "rate limited"))
+            if error.get("type") == "NOT_FOUND":
+                raise GithubNotFoundError(error.get("message", "not found"))
+            # Partial data with errors (e.g. one inaccessible repo) is
+            # still usable — only fail if nothing came back.
+            if not payload.get("data"):
+                raise GithubApiError(f"GraphQL error: {error.get('message', 'unknown')}")
 
-        if "errors" in data:
-            error_msg = data["errors"][0].get("message", "Unknown error")
-            if "Could not resolve" in error_msg:
-                raise GithubNotFoundError(f"User not found: {error_msg}")
-            raise GithubApiError(f"GraphQL error: {error_msg}")
-
-        return data.get("data", {})
-
-    async def fetch_user_data(self, username: str) -> GithubUserResponse:
-        """
-        Fetch complete user data including profile, contributions, and repositories.
-        Automatically handles pagination if user has >100 repos.
-        """
-        data = await self._execute_query(
-            USER_QUERY,
-            {"username": username, "repoCount": 100},
-        )
-
-        response = GithubUserResponse(**data)
-
-        if not response.user:
-            raise GithubNotFoundError(f"User {username} not found")
-
-        if response.user.repositories.page_info.get("hasNextPage"):
-            logger.info(f"User {username} has >100 repos, fetching remaining pages")
-            await self._fetch_remaining_repos(response.user, username)
-
-        return response
-
-    async def _fetch_remaining_repos(self, user, username: str) -> None:
-        """Fetch remaining repositories if user has more than 100."""
-        cursor = user.repositories.page_info.get("endCursor")
-        has_next_page = True
-
-        while has_next_page:
-            data = await self._execute_query(
-                PAGINATED_REPOS_QUERY,
-                {"username": username, "cursor": cursor, "repoCount": 100},
-            )
-
-            repos_data = data.get("user", {}).get("repositories", {})
-            nodes = repos_data.get("nodes", [])
-            page_info = repos_data.get("pageInfo", {})
-
-            for node in nodes:
-                user.repositories.nodes.append(GithubRepository(**node))
-
-            has_next_page = page_info.get("hasNextPage", False)
-            cursor = page_info.get("endCursor")
-
-            logger.info(f"Fetched {len(nodes)} more repos for {username}")
-
-    async def fetch_repository_languages(self, owner: str, name: str) -> RepositoryLanguages:
-        """Fetch language byte counts for a specific repository."""
-        data = await self._execute_query(
-            REPO_LANGUAGES_QUERY,
-            {"owner": owner, "name": name},
-        )
-
-        repo_data = data.get("repository")
-        if not repo_data:
-            raise GithubNotFoundError(f"Repository {owner}/{name} not found")
-
-        return RepositoryLanguages(**repo_data.get("languages", {"edges": []}))
+        return payload.get("data") or {}

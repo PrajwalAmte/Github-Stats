@@ -17,6 +17,7 @@ class ContributionWeek(BaseModel):
 class ContributionCalendar(BaseModel):
     """Full contribution calendar."""
 
+    total_contributions: int = Field(alias="totalContributions")
     weeks: list[ContributionWeek]
 
 
@@ -32,54 +33,48 @@ class ContributionsCollection(BaseModel):
     )
 
 
+class LanguageNode(BaseModel):
+    name: str
+    color: str | None = None
+
+
 class LanguageEdge(BaseModel):
     """Language with byte size."""
 
     size: int
-    node: dict  # {name: str}
+    node: LanguageNode
 
 
 class RepositoryLanguages(BaseModel):
     """Repository language breakdown."""
 
-    edges: list[LanguageEdge]
-
-
-class PrimaryLanguage(BaseModel):
-    """Primary language of a repository."""
-
-    name: str
+    edges: list[LanguageEdge] = []
 
 
 class GithubRepository(BaseModel):
     """GitHub repository from GraphQL."""
 
-    id: str
-    database_id: int = Field(alias="databaseId")
-    name: str
     stargazer_count: int = Field(alias="stargazerCount", default=0)
     fork_count: int = Field(alias="forkCount", default=0)
-    primary_language: PrimaryLanguage | None = Field(alias="primaryLanguage", default=None)
     is_fork: bool = Field(alias="isFork", default=False)
-    pushed_at: str | None = Field(alias="pushedAt", default=None)
     languages: RepositoryLanguages | None = None
+
+
+class PageInfo(BaseModel):
+    has_next_page: bool = Field(alias="hasNextPage", default=False)
+    end_cursor: str | None = Field(alias="endCursor", default=None)
 
 
 class RepositoryConnection(BaseModel):
     """Paginated repository connection."""
 
+    total_count: int = Field(alias="totalCount", default=0)
     nodes: list[GithubRepository]
-    page_info: dict = Field(alias="pageInfo")  # {hasNextPage, endCursor}
+    page_info: PageInfo = Field(alias="pageInfo")
 
 
 class FollowersConnection(BaseModel):
     """Followers connection."""
-
-    total_count: int = Field(alias="totalCount")
-
-
-class FollowingConnection(BaseModel):
-    """Following connection."""
 
     total_count: int = Field(alias="totalCount")
 
@@ -89,14 +84,6 @@ class GithubUser(BaseModel):
 
     login: str
     name: str | None = None
-    avatar_url: str = Field(alias="avatarUrl")
     followers: FollowersConnection
-    following: FollowingConnection
     repositories: RepositoryConnection
     contributions_collection: ContributionsCollection = Field(alias="contributionsCollection")
-
-
-class GithubUserResponse(BaseModel):
-    """Top-level GraphQL response."""
-
-    user: GithubUser | None = None

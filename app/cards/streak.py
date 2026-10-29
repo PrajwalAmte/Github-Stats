@@ -1,14 +1,17 @@
 """Contribution streak SVG card."""
 
-from datetime import datetime
+from app.stats.models import UserStats
 
 from .components import (
     block_meter,
     card_frame,
     cursor_blink,
+    fmt,
     font,
     footer_comment,
+    svg_open,
     terminal_chrome,
+    updated_label,
 )
 from .theme import COLORS
 
@@ -18,31 +21,19 @@ CHROME_H = 40
 SEGMENTS = 20
 
 
-def generate_streak_card(
-    username: str,
-    current_streak: int,
-    longest_streak: int,
-    total_contributions: int,
-    last_sync: datetime | None = None,
-) -> str:
+def generate_streak_card(stats: UserStats) -> str:
     """Generate a contribution streak SVG card.
 
     The streak bar is a segmented block meter (current / longest),
     not a smooth progress bar — reads like a terminal load indicator
     rather than a generic dashboard widget.
     """
-
-    def fmt(n: int) -> str:
-        return f"{n:,}"
-
-    last_updated = last_sync.strftime("%Y-%m-%d %H:%M UTC") if last_sync else "never"
+    current_streak, longest_streak = stats.current_streak, stats.longest_streak
     filled = (current_streak / longest_streak) * SEGMENTS if longest_streak > 0 else 0
 
-    parts: list[str] = [
-        f'<svg width="{WIDTH}" height="{HEIGHT}" xmlns="http://www.w3.org/2000/svg">'
-    ]
+    parts: list[str] = [svg_open(WIDTH, HEIGHT)]
     parts += card_frame(WIDTH, HEIGHT)
-    parts += terminal_chrome(WIDTH, f"guest@github:~$ streak --user {username}", CHROME_H)
+    parts += terminal_chrome(WIDTH, f"guest@github:~$ streak --user {stats.username}", CHROME_H)
 
     big_y = CHROME_H + 48
     parts.append(
@@ -62,11 +53,11 @@ def generate_streak_card(
     contrib_y = meter_y + 32
     parts.append(
         f'<text x="24" y="{contrib_y}" {font(12)} fill="{COLORS["dim"]}">'
-        f'total contributions: <tspan fill="{COLORS["text"]}" font-weight="600">{fmt(total_contributions)}</tspan></text>'
+        f'total contributions: <tspan fill="{COLORS["text"]}" font-weight="600">{fmt(stats.contribution_count)}</tspan></text>'
     )
 
     footer_y = HEIGHT - 16
-    parts.append(footer_comment(WIDTH / 2, footer_y, f"# synced {last_updated} \u00b7 v1"))
+    parts.append(footer_comment(WIDTH / 2, footer_y, updated_label(stats.fetched_at)))
     parts.append(cursor_blink(WIDTH - 32, footer_y))
 
     parts.append("</svg>")

@@ -42,11 +42,9 @@ ENV/
 # Testing
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
 .tox/
-
-# Alembic
-alembic/versions/*.pyc
 
 # Logs
 *.log

@@ -24,15 +24,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Run tests with coverage
         run: |
           pytest -v --tb=short --cov=app --cov-report=term-missing --cov-report=xml
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test
           GITHUB_TOKEN: fake_token_for_testing
-          SYNC_SECRET: test_secret_12345
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -56,7 +54,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           pip install bandit isort mypy
 
       - name: Check code formatting
@@ -88,7 +86,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           pip install bandit safety
 
       - name: Run Bandit security scan
@@ -129,7 +127,7 @@ jobs:
       - name: Validate requirements.txt
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           echo "All dependencies installed successfully"
 
   summary:

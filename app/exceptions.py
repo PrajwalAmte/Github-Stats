@@ -23,21 +23,3 @@ class GithubAuthenticationError(GithubApiError):
     """GitHub authentication failed."""
 
     pass
-
-
-class SyncAlreadyRunningError(Exception):
-    """Synchronization is already in progress for this user."""
-
-    pass
-
-
-class DatabaseError(Exception):
-    """Database operation failed."""
-
-    pass
-
-
-class ValidationError(Exception):
-    """Request validation failed."""
-
-    pass
